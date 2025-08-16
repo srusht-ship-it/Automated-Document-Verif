@@ -10,6 +10,7 @@ const { syncModels } = require('./models');
 
 // Import routes
 const authRoutes = require('./routes/auth');
+const documentRoutes = require('./routes/documents');
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.get('/api/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Initialize database models
 const initializeDatabase = async () => {
