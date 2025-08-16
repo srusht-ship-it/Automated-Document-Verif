@@ -5,6 +5,12 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
+// Import models for database sync
+const { syncModels } = require('./models');
+
+// Import routes
+const authRoutes = require('./routes/auth');
+
 const app = express();
 
 // Security middleware
@@ -14,7 +20,10 @@ app.use(helmet());
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) * 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS),
-  message: 'Too many requests from this IP, please try again later.'
+  message: {
+    success: false,
+    message: 'Too many requests from this IP, please try again later.'
+  }
 });
 app.use('/api/', limiter);
 
@@ -31,18 +40,37 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // Static files for uploads
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Basic routes (we'll add more later)
+// Routes
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 
-    message: 'Server is running', 
-    timestamp: new Date().toISOString() 
+    success: true,
+    message: 'Document Verification System API is running', 
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
   });
 });
 
+// API Routes
+app.use('/api/auth', authRoutes);
+
+// Initialize database models
+const initializeDatabase = async () => {
+  try {
+    await syncModels();
+    console.log('✅ Database models synchronized');
+  } catch (error) {
+    console.error('❌ Database initialization failed:', error);
+  }
+};
+
+// Initialize database on startup
+initializeDatabase();
+
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Error:', err.stack);
   res.status(500).json({ 
+    success: false,
     message: 'Something went wrong!', 
     error: process.env.NODE_ENV === 'development' ? err.message : undefined 
   });
@@ -50,7 +78,10 @@ app.use((err, req, res, next) => {
 
 // 404 handler
 app.use('*', (req, res) => {
-  res.status(404).json({ message: 'Route not found' });
+  res.status(404).json({ 
+    success: false,
+    message: 'Route not found' 
+  });
 });
 
 module.exports = app;
