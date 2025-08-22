@@ -2,7 +2,7 @@
   "name": "document-verification-system",
   "version": "1.0.0",
   "description": "AI-powered document verification system with blockchain simulation",
-  "main": "index.js",
+  "main": "components/HomePage.js",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd backend && npm run dev",
