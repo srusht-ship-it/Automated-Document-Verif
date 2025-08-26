@@ -139,10 +139,69 @@ const VerificationHistory = () => {
           color: '#f59e0b' 
         };
       default:
-        return { 
-          icon: '❓', 
-          class: 'unknown', 
-          text: 'Unknown',
-          color: '#6b7280' 
+                    return { 
+                      icon: '❓', 
+                      class: 'unknown', 
+                      text: 'Unknown',
+                      color: '#6b7280' 
+                    };
+                }
+          };
+        
+          const filteredVerifications = filterStatus === 'all'
+            ? verifications
+            : verifications.filter(v => v.status === filterStatus);
+        
+          return (
+            <div className="verification-history">
+              <h2>Verification History</h2>
+              <div className="filter-group">
+                <label>Filter by Status:</label>
+                <select
+                  value={filterStatus}
+                  onChange={e => setFilterStatus(e.target.value)}
+                >
+                  <option value="all">All</option>
+                  <option value="verified">Verified</option>
+                  <option value="pending">Pending</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+              <table className="verification-table">
+                <thead>
+                  <tr>
+                    <th>Document</th>
+                    <th>Verifier</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Purpose</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredVerifications.map(v => {
+                    const statusConfig = getStatusConfig(v.status, v.confidenceScore);
+                    return (
+                      <tr key={v.id}>
+                        <td>{v.documentName}</td>
+                        <td>{v.verifierName}</td>
+                        <td>{new Date(v.verificationDate).toLocaleString()}</td>
+                        <td>
+                          <span
+                            className={`status-badge ${statusConfig.class}`}
+                            style={{ color: statusConfig.color }}
+                          >
+                            {statusConfig.icon} {statusConfig.text}
+                          </span>
+                        </td>
+                        <td>{v.purpose}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          );
         };
-    }
+        
+        export default IndividualDashboard;
+    

@@ -1,10 +1,11 @@
 // frontend/src/components/Login.js
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { authService } from '../services/auth';
-import './Login.css';
+import authService from "../services/auth";   // ✅ Default import
 
-const Login = ({ onLogin }) => {
+import './login.css';
+
+const Login = ({ onLogin }) => {  // ✅ Changed from 'login' to 'Login'
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -170,4 +171,4 @@ const Login = ({ onLogin }) => {
   );
 };
 
-export default Login;
+export default Login;  // ✅ Changed from 'login' to 'Login'

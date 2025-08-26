@@ -1,7 +1,8 @@
 // frontend/src/components/Register.js
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { authService } from '../services/auth';
+import authService from "../services/auth";   // ✅ Default import
+
 import '../styles/Register.css';
 
 const Register = ({ onRegister }) => {
