@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
-const jwtConfig = require('../config/jwt');
+require('dotenv').config();
 
 // Verify JWT token
 const authenticateToken = async (req, res, next) => {
@@ -16,7 +16,7 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Verify token
-    const decoded = jwt.verify(token, jwtConfig.secret);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Get user from database
     const user = await User.findByPk(decoded.userId);
@@ -85,7 +85,7 @@ const optionalAuth = async (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1];
 
     if (token) {
-      const decoded = jwt.verify(token, jwtConfig.secret);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await User.findByPk(decoded.userId);
       if (user) {
         req.user = user;

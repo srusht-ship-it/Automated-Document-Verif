@@ -1,9 +1,14 @@
 // frontend/src/pages/HomePage.js
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import authService from '../services/auth';
 import '../styles/HomePage.css';
 
 const HomePage = () => {
+  const navigate = useNavigate();
+
+  // Remove automatic redirect - let users see the main homepage
+
   return (
     <div className="homepage">
       {/* Hero Section */}
@@ -36,13 +41,13 @@ const HomePage = () => {
               </div>
 
               <div className="hero-actions">
-                <Link to="/register" className="cta-button primary">
+                <Link to="/dashboard" className="cta-button primary">
+                  Try Dashboard
+                  <span className="button-icon">📊</span>
+                </Link>
+                <Link to="/register" className="cta-button secondary">
                   Get Started Free
                   <span className="button-icon">🚀</span>
-                </Link>
-                <Link to="/login" className="cta-button secondary">
-                  Sign In
-                  <span className="button-icon">👤</span>
                 </Link>
               </div>
             </div>

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import Dashboard from '../components/Dashboard';
 import DocumentUpload from '../components/DocumentUpload';
 import DocumentList from '../components/DocumentList';
-import '../styles/Dashboard.css';
+import '../styles/IndividualDashboard.css';
 
 const IndividualDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -22,6 +22,7 @@ const IndividualDashboard = () => {
   };
 
   const renderTabContent = () => {
+    console.log('Active tab:', activeTab);
     switch (activeTab) {
       case 'overview':
         return <Dashboard />;
@@ -56,7 +57,10 @@ const IndividualDashboard = () => {
             <button
               key={tab.id}
               className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                console.log('Clicking tab:', tab.id);
+                setActiveTab(tab.id);
+              }}
             >
               <span className="nav-icon">{tab.icon}</span>
               <span className="nav-label">{tab.label}</span>
@@ -199,6 +203,101 @@ const VerificationHistory = () => {
                   })}
                 </tbody>
               </table>
+            </div>
+          );
+        };
+        
+        // Share Documents Component
+        const ShareDocuments = () => {
+          const [documents, setDocuments] = useState([
+            {
+              id: 1,
+              name: 'Degree Certificate.pdf',
+              type: 'Education',
+              uploadDate: '2024-01-15',
+              isShared: false,
+              shareLink: null
+            },
+            {
+              id: 2,
+              name: 'Passport.jpg',
+              type: 'Identity',
+              uploadDate: '2024-01-10',
+              isShared: true,
+              shareLink: 'https://verify.app/share/abc123'
+            }
+          ]);
+        
+          const generateShareLink = (documentId) => {
+            const shareLink = `https://verify.app/share/${Math.random().toString(36).substr(2, 9)}`;
+            setDocuments(docs => 
+              docs.map(doc => 
+                doc.id === documentId 
+                  ? { ...doc, isShared: true, shareLink }
+                  : doc
+              )
+            );
+          };
+        
+          const revokeShare = (documentId) => {
+            setDocuments(docs => 
+              docs.map(doc => 
+                doc.id === documentId 
+                  ? { ...doc, isShared: false, shareLink: null }
+                  : doc
+              )
+            );
+          };
+        
+          return (
+            <div className="share-documents">
+              <h2>Share Documents</h2>
+              <p>Generate secure links to share your verified documents with third parties.</p>
+              
+              <div className="documents-grid">
+                {documents.map(doc => (
+                  <div key={doc.id} className="document-card">
+                    <div className="document-info">
+                      <h3>{doc.name}</h3>
+                      <p>Type: {doc.type}</p>
+                      <p>Uploaded: {doc.uploadDate}</p>
+                    </div>
+                    
+                    <div className="share-actions">
+                      {doc.isShared ? (
+                        <div className="shared-info">
+                          <p>✅ Shared</p>
+                          <input 
+                            type="text" 
+                            value={doc.shareLink} 
+                            readOnly 
+                            className="share-link"
+                          />
+                          <button 
+                            onClick={() => navigator.clipboard.writeText(doc.shareLink)}
+                            className="copy-btn"
+                          >
+                            📋 Copy
+                          </button>
+                          <button 
+                            onClick={() => revokeShare(doc.id)}
+                            className="revoke-btn"
+                          >
+                            🚫 Revoke
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => generateShareLink(doc.id)}
+                          className="share-btn"
+                        >
+                          🔗 Generate Share Link
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           );
         };

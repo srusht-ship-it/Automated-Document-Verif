@@ -126,9 +126,12 @@ const DocumentUpload = ({ onUploadSuccess }) => {
 
         const formData = new FormData();
         formData.append('document', fileData.file);
+        formData.append('documentType', 'other');
+        formData.append('recipientEmail', 'individual@demo.com');
+        formData.append('description', `Uploaded via frontend: ${fileData.name}`);
 
         // Get auth token
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('doc_verify_token');
         
         const response = await fetch('http://localhost:5000/api/documents/upload', {
           method: 'POST',
@@ -149,7 +152,7 @@ const DocumentUpload = ({ onUploadSuccess }) => {
           results.push({
             ...fileData,
             status: 'completed',
-            documentId: result.document.id,
+            documentId: result.data.document.id,
             uploadDate: new Date().toISOString()
           });
 

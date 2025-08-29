@@ -1,11 +1,11 @@
 // frontend/src/components/Register.js
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import authService from "../services/auth";   // ✅ Default import
-
+import { Link, useNavigate } from 'react-router-dom';
+import authService from '../services/auth';
 import '../styles/Register.css';
 
 const Register = ({ onRegister }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -112,8 +112,17 @@ const Register = ({ onRegister }) => {
       const response = await authService.register(registrationData);
       
       if (response.success) {
-        // Call parent component's register handler
-        onRegister(response.data.token, response.data.user);
+        // Check if onRegister prop is provided and is a function
+        if (onRegister && typeof onRegister === 'function') {
+          onRegister(response.data.token, response.data.user);
+        } else {
+          // Fallback: redirect to login or dashboard
+          console.log('Registration successful:', response.data);
+          // You can redirect to login page or dashboard based on your app flow
+          navigate('/login', { 
+            state: { message: 'Registration successful! Please log in.' } 
+          });
+        }
       }
     } catch (error) {
       console.error('Registration error:', error);
@@ -125,8 +134,15 @@ const Register = ({ onRegister }) => {
           backendErrors[err.path || err.param] = err.msg;
         });
         setErrors(backendErrors);
+      } else if (error.response && error.response.data) {
+        // Handle other API errors
+        setErrors({ 
+          general: error.response.data.message || 'Registration failed. Please try again.' 
+        });
       } else {
-        setErrors({ general: error.message || 'Registration failed. Please try again.' });
+        setErrors({ 
+          general: error.message || 'Registration failed. Please try again.' 
+        });
       }
     } finally {
       setLoading(false);
@@ -279,8 +295,9 @@ const Register = ({ onRegister }) => {
                   className="password-toggle"
                   onClick={() => setShowPassword(!showPassword)}
                   disabled={loading}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? '👁️' : '👁️‍🗨️'}
+                  {showPassword ? '🙈' : '👁️'}
                 </button>
               </div>
               {errors.password && <span className="field-error">{errors.password}</span>}
@@ -320,8 +337,9 @@ const Register = ({ onRegister }) => {
                   className="password-toggle"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   disabled={loading}
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
+                  {showConfirmPassword ? '🙈' : '👁️'}
                 </button>
               </div>
               {errors.confirmPassword && <span className="field-error">{errors.confirmPassword}</span>}

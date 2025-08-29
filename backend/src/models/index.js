@@ -1,6 +1,6 @@
+const { sequelize } = require('../config/database');
 const User = require('./User');
 const Document = require('./Document');
-const { sequelize } = require('../config/database');
 
 // Define associations
 User.hasMany(Document, { 

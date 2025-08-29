@@ -5,7 +5,8 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
-// Import models for database sync
+// Import database and models
+const { sequelize, testConnection } = require('./config/database');
 const { syncModels } = require('./models');
 
 // Import routes
@@ -19,8 +20,8 @@ app.use(helmet());
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) * 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS),
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later.'
@@ -58,6 +59,7 @@ app.use('/api/documents', documentRoutes);
 // Initialize database models
 const initializeDatabase = async () => {
   try {
+    await testConnection();
     await syncModels();
     console.log('✅ Database models synchronized');
   } catch (error) {

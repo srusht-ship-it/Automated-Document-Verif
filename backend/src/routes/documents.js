@@ -66,11 +66,11 @@ const listValidation = [
 
 /**
  * POST /api/documents/upload
- * Upload a new document (Issuer only)
+ * Upload a new document (Issuer and Individual)
  */
 router.post('/upload', 
   authenticateToken,
-  requireRole('issuer'),
+  requireRole(['issuer', 'individual']),
   handleFileUpload,
   validateFileExists,
   uploadValidation,
@@ -114,6 +114,7 @@ router.delete('/:id',
  */
 router.get('/:id/download', 
   authenticateToken,
+  requireRole(['issuer', 'individual', 'verifier']),
   async (req, res) => {
     try {
       const { Document, User } = require('../models');

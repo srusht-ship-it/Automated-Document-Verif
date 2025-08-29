@@ -16,21 +16,32 @@ const Dashboard = () => {
 
   useEffect(() => {
     // Get user from localStorage (set during login)
-    const userData = localStorage.getItem('user');
-    if (!userData) {
-      navigate('/login');
-      return;
+    const userData = localStorage.getItem('doc_verify_user');
+    if (userData) {
+      const parsedUser = JSON.parse(userData);
+      setUser(parsedUser);
+      loadDashboardData(parsedUser);
+    } else {
+      // Show default dashboard for non-authenticated users
+      setUser(null);
+      loadDashboardData(null);
     }
-    
-    const parsedUser = JSON.parse(userData);
-    setUser(parsedUser);
-    loadDashboardData(parsedUser);
-  }, [navigate]);
+  }, []);
 
   const loadDashboardData = async (userData) => {
     try {
       // Mock data for now - will be replaced with actual API calls
       const mockStats = {
+        default: {
+          totalDocuments: 1000,
+          pendingVerifications: 50,
+          completedVerifications: 950,
+          recentActivity: [
+            { type: 'demo', document: 'Sample Certificate', date: '2024-01-20' },
+            { type: 'demo', document: 'Demo Transcript', date: '2024-01-19' },
+            { type: 'demo', document: 'Test Document', date: '2024-01-18' }
+          ]
+        },
         issuer: {
           totalDocuments: 156,
           pendingVerifications: 12,
@@ -63,7 +74,7 @@ const Dashboard = () => {
         }
       };
 
-      setStats(mockStats[userData.role] || mockStats.individual);
+      setStats(mockStats[userData?.role] || mockStats.default);
       setLoading(false);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -90,22 +101,22 @@ const Dashboard = () => {
   const getQuickActions = () => {
     const actions = {
       issuer: [
-        { title: 'Issue New Certificate', icon: '📜', path: '/documents/upload', color: 'primary' },
-        { title: 'View Issued Documents', icon: '📋', path: '/documents', color: 'secondary' },
-        { title: 'Batch Upload', icon: '📤', path: '/documents/batch', color: 'tertiary' },
-        { title: 'Templates', icon: '🎨', path: '/templates', color: 'quaternary' }
+        { title: 'Issue New Certificate', icon: '📜', action: () => {}, color: 'primary' },
+        { title: 'View Issued Documents', icon: '📋', action: () => {}, color: 'secondary' },
+        { title: 'Batch Upload', icon: '📤', action: () => {}, color: 'tertiary' },
+        { title: 'Templates', icon: '🎨', action: () => {}, color: 'quaternary' }
       ],
       individual: [
-        { title: 'Upload Document', icon: '📎', path: '/documents/upload', color: 'primary' },
-        { title: 'My Documents', icon: '📄', path: '/documents', color: 'secondary' },
-        { title: 'Verification History', icon: '🔍', path: '/verifications', color: 'tertiary' },
-        { title: 'Share Documents', icon: '🔗', path: '/share', color: 'quaternary' }
+        { title: 'Upload Document', icon: '📎', action: () => {}, color: 'primary' },
+        { title: 'My Documents', icon: '📄', action: () => {}, color: 'secondary' },
+        { title: 'Verification History', icon: '🔍', action: () => {}, color: 'tertiary' },
+        { title: 'Share Documents', icon: '🔗', action: () => {}, color: 'quaternary' }
       ],
       verifier: [
-        { title: 'Verify Document', icon: '✅', path: '/verify', color: 'primary' },
-        { title: 'Verification Queue', icon: '⏳', path: '/queue', color: 'secondary' },
-        { title: 'Verification History', icon: '📊', path: '/history', color: 'tertiary' },
-        { title: 'Reports', icon: '📈', path: '/reports', color: 'quaternary' }
+        { title: 'Verify Document', icon: '✅', action: () => {}, color: 'primary' },
+        { title: 'Verification Queue', icon: '⏳', action: () => {}, color: 'secondary' },
+        { title: 'Verification History', icon: '📊', action: () => {}, color: 'tertiary' },
+        { title: 'Reports', icon: '📈', action: () => {}, color: 'quaternary' }
       ]
     };
     return actions[user?.role] || actions.individual;
@@ -124,7 +135,7 @@ const Dashboard = () => {
     <div className="dashboard">
       <div className="dashboard-header">
         <div className="welcome-section">
-          <h1>{getGreeting()}, {user?.name}!</h1>
+          <h1>{getGreeting()}, {user?.firstName || user?.name || 'Welcome to DocVerify'}!</h1>
           <p className="role-badge">{getRoleName(user?.role)}</p>
         </div>
         <div className="header-actions">
@@ -177,7 +188,7 @@ const Dashboard = () => {
               <button
                 key={index}
                 className={`quick-action-card ${action.color}`}
-                onClick={() => navigate(action.path)}
+                onClick={action.action}
               >
                 <div className="action-icon">{action.icon}</div>
                 <span className="action-title">{action.title}</span>
