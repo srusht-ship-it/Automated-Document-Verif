@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import authService from '../services/auth';
+import Footer from '../components/Footer';
 import '../styles/HomePage.css';
 
 const HomePage = () => {
@@ -128,6 +129,7 @@ const HomePage = () => {
           </div>
         </div>
       </section>
+      <Footer />
     </div>
   );
 };

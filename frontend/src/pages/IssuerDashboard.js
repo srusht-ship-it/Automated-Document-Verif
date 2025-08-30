@@ -4,6 +4,7 @@ import HeaderBar from '../components/HeaderBar';
 import StatsCards from '../components/StatsCards';
 import DocumentUpload from '../components/DocumentUpload';
 import DocumentList from '../components/DocumentList';
+import Footer from '../components/Footer';
 import '../styles/theme.css';
 import '../styles/IssuerDashboard.css';
 
@@ -52,6 +53,8 @@ const IssuerDashboard = () => {
         return <DocumentTemplates />;
       case 'bulk':
         return <BulkUploadInterface />;
+      case 'analytics':
+        return <Analytics />;
       default:
         return (
           <div className="tab-content">
@@ -83,6 +86,7 @@ const IssuerDashboard = () => {
             {renderTabContent()}
           </div>
         </main>
+        <Footer />
       </div>
     </div>
   );
@@ -90,34 +94,33 @@ const IssuerDashboard = () => {
 
 // Document Templates Component
 const DocumentTemplates = () => {
-  const [templates, setTemplates] = useState([
-    {
-      id: 1,
-      name: 'Degree Certificate',
-      type: 'Educational',
-      fields: ['Student Name', 'Degree', 'Institution', 'Date', 'Grade'],
-      usage: 45,
-      lastUsed: '2024-01-18'
-    },
-    {
-      id: 2,
-      name: 'Transcript',
-      type: 'Educational',
-      fields: ['Student Name', 'Courses', 'Grades', 'Credits', 'GPA'],
-      usage: 32,
-      lastUsed: '2024-01-19'
-    },
-    {
-      id: 3,
-      name: 'Employment Certificate',
-      type: 'Professional',
-      fields: ['Employee Name', 'Position', 'Department', 'Duration', 'Salary'],
-      usage: 28,
-      lastUsed: '2024-01-20'
-    }
-  ]);
-
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showCreateTemplate, setShowCreateTemplate] = useState(false);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, []);
+
+  const fetchTemplates = async () => {
+    try {
+      const token = localStorage.getItem('doc_verify_token');
+      const response = await fetch('http://localhost:5000/api/templates', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTemplates(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="document-templates">
@@ -132,55 +135,62 @@ const DocumentTemplates = () => {
         </button>
       </div>
 
-      <div className="templates-grid">
-        {templates.map(template => (
-          <div key={template.id} className="template-card">
-            <div className="template-header">
-              <h3>{template.name}</h3>
-              <span className="template-type">{template.type}</span>
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px' }}>Loading templates...</div>
+      ) : (
+        <div className="templates-grid">
+          {templates.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px', gridColumn: '1 / -1' }}>
+              <h3>No templates created yet</h3>
+              <p>Create your first template to get started</p>
             </div>
+          ) : (
+            templates.map(template => (
+              <div key={template.id} className="template-card">
+                <div className="template-header">
+                  <h3>{template.name}</h3>
+                  <span className="template-type">{template.type}</span>
+                </div>
 
-            <div className="template-fields">
-              <h4>Fields:</h4>
-              <div className="fields-list">
-                {template.fields.map((field, index) => (
-                  <span key={index} className="field-tag">{field}</span>
-                ))}
-              </div>
-            </div>
+                <div className="template-fields">
+                  <h4>Fields:</h4>
+                  <div className="fields-list">
+                    {template.fields.map((field, index) => (
+                      <span key={index} className="field-tag">{field}</span>
+                    ))}
+                  </div>
+                </div>
 
-            <div className="template-stats">
-              <div className="stat">
-                <span className="stat-label">Usage:</span>
-                <span className="stat-value">{template.usage}</span>
-              </div>
-              <div className="stat">
-                <span className="stat-label">Last Used:</span>
-                <span className="stat-value">{new Date(template.lastUsed).toLocaleDateString()}</span>
-              </div>
-            </div>
+                <div className="template-stats">
+                  <div className="stat">
+                    <span className="stat-label">Usage:</span>
+                    <span className="stat-value">{template.usage || 0}</span>
+                  </div>
+                  <div className="stat">
+                    <span className="stat-label">Created:</span>
+                    <span className="stat-value">{new Date(template.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
 
-            <div className="template-actions">
-              <button className="action-btn primary">📝 Edit</button>
-              <button className="action-btn secondary">📄 Use</button>
-              <button className="action-btn tertiary">🗑️ Delete</button>
-            </div>
-          </div>
-        ))}
-      </div>
+                <div className="template-actions">
+                  <button className="action-btn primary">📝 Edit</button>
+                  <button className="action-btn secondary">📄 Use</button>
+                  <button className="action-btn tertiary">🗑️ Delete</button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {showCreateTemplate && (
-        <div className="modal-overlay" onClick={() => setShowCreateTemplate(false)}>
-          <div className="create-template-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Create New Template</h2>
-              <button className="close-btn" onClick={() => setShowCreateTemplate(false)}>×</button>
-            </div>
-            <div className="modal-content">
-              <p>Template creation form would go here...</p>
-            </div>
-          </div>
-        </div>
+        <CreateTemplateModal 
+          onClose={() => setShowCreateTemplate(false)}
+          onSave={(newTemplate) => {
+            setTemplates(prev => [...prev, newTemplate]);
+            setShowCreateTemplate(false);
+          }}
+        />
       )}
     </div>
   );
@@ -318,14 +328,414 @@ const DocumentIssuancePanel = ({ onUploadSuccess }) => {
 
 // Bulk Upload Interface Component
 const BulkUploadInterface = () => {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  const downloadTemplate = () => {
+    // Create CSV template with headers
+    const headers = [
+      'Document Name',
+      'Document Type', 
+      'Recipient Name',
+      'Recipient Email',
+      'Issue Date',
+      'Expiry Date',
+      'Additional Info'
+    ];
+    
+    const csvContent = headers.join(',') + '\n';
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'bulk_upload_template.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (file && file.type === 'text/csv') {
+      setSelectedFile(file);
+    } else {
+      alert('Please select a valid CSV file');
+    }
+  };
+
+  const handleBulkUpload = async () => {
+    if (!selectedFile) {
+      alert('Please select a CSV file first');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const token = localStorage.getItem('doc_verify_token');
+      const formData = new FormData();
+      formData.append('csvFile', selectedFile);
+
+      const response = await fetch('http://localhost:5000/api/bulk/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert(`Bulk upload completed! ${result.data.successful} documents processed successfully, ${result.data.failed} failed.`);
+        setSelectedFile(null);
+      } else {
+        alert(`Bulk upload failed: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Bulk upload error:', error);
+      alert('Bulk upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
-    <div className="bulk-upload">
-      <div className="card">
-        <h3>Bulk Document Upload</h3>
-        <p>Upload multiple documents at once using CSV template</p>
-        <div className="bulk-actions">
-          <button className="btn btn-secondary">📥 Download Template</button>
-          <button className="btn btn-primary">📤 Upload CSV</button>
+    <div className="tab-content">
+      <h2 className="section-title">Bulk Operations</h2>
+      
+      <div className="bulk-upload">
+        <div className="card">
+          <h3>📦 Bulk Document Upload</h3>
+          <p>Upload multiple documents at once using our CSV template</p>
+          
+          <div className="bulk-steps">
+            <div className="step">
+              <div className="step-number">1</div>
+              <div className="step-content">
+                <h4>Download Template</h4>
+                <p>Get the CSV template with required columns</p>
+                <button 
+                  className="btn btn-secondary"
+                  onClick={downloadTemplate}
+                >
+                  📥 Download Template
+                </button>
+              </div>
+            </div>
+            
+            <div className="step">
+              <div className="step-number">2</div>
+              <div className="step-content">
+                <h4>Fill Template</h4>
+                <p>Add your document data to the CSV file</p>
+                <div className="template-info">
+                  <strong>Required columns:</strong>
+                  <ul>
+                    <li>Document Name</li>
+                    <li>Document Type</li>
+                    <li>Recipient Name</li>
+                    <li>Recipient Email</li>
+                    <li>Issue Date (YYYY-MM-DD)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            
+            <div className="step">
+              <div className="step-number">3</div>
+              <div className="step-content">
+                <h4>Upload CSV</h4>
+                <p>Select and upload your completed CSV file</p>
+                <div className="file-upload">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileSelect}
+                    style={{ marginBottom: '10px' }}
+                  />
+                  {selectedFile && (
+                    <div className="selected-file">
+                      ✅ Selected: {selectedFile.name}
+                    </div>
+                  )}
+                  <button 
+                    className="btn btn-primary"
+                    onClick={handleBulkUpload}
+                    disabled={!selectedFile || uploading}
+                  >
+                    {uploading ? '⏳ Uploading...' : '📤 Upload CSV'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="card">
+          <h3>📊 Bulk Upload History</h3>
+          <div className="upload-history">
+            <div className="history-item">
+              <div className="history-info">
+                <strong>January Graduates</strong>
+                <div className="history-details">
+                  45 documents • Completed • Jan 20, 2024
+                </div>
+              </div>
+              <div className="history-status success">✅ Success</div>
+            </div>
+            
+            <div className="history-item">
+              <div className="history-info">
+                <strong>Employee Certificates</strong>
+                <div className="history-details">
+                  23 documents • Completed • Jan 18, 2024
+                </div>
+              </div>
+              <div className="history-status success">✅ Success</div>
+            </div>
+            
+            <div className="history-item">
+              <div className="history-info">
+                <strong>Training Certificates</strong>
+                <div className="history-details">
+                  12 documents • Failed • Jan 15, 2024
+                </div>
+              </div>
+              <div className="history-status error">❌ Failed</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Create Template Modal Component
+const CreateTemplateModal = ({ onClose, onSave }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    type: 'Educational',
+    description: '',
+    fields: []
+  });
+  const [newField, setNewField] = useState('');
+  const [errors, setErrors] = useState({});
+
+  const documentTypes = [
+    'Educational',
+    'Professional', 
+    'Government',
+    'Medical',
+    'Legal',
+    'Financial'
+  ];
+
+  const predefinedFields = [
+    'Full Name', 'Student Name', 'Employee Name',
+    'Date of Birth', 'Issue Date', 'Expiry Date',
+    'Institution', 'Organization', 'Department',
+    'Degree', 'Position', 'Grade', 'GPA',
+    'Course', 'Duration', 'Salary', 'ID Number'
+  ];
+
+  const handleInputChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+    if (errors[e.target.name]) {
+      setErrors({ ...errors, [e.target.name]: '' });
+    }
+  };
+
+  const addField = (fieldName) => {
+    if (fieldName && !formData.fields.includes(fieldName)) {
+      setFormData({
+        ...formData,
+        fields: [...formData.fields, fieldName]
+      });
+      setNewField('');
+    }
+  };
+
+  const removeField = (fieldToRemove) => {
+    setFormData({
+      ...formData,
+      fields: formData.fields.filter(field => field !== fieldToRemove)
+    });
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.name.trim()) {
+      newErrors.name = 'Template name is required';
+    }
+    
+    if (formData.fields.length === 0) {
+      newErrors.fields = 'At least one field is required';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSave = async () => {
+    if (validateForm()) {
+      try {
+        console.log('Sending template data:', formData);
+        const token = localStorage.getItem('doc_verify_token');
+        const response = await fetch('http://localhost:5000/api/templates', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(formData)
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          onSave(result.data);
+        } else {
+          const error = await response.json();
+          console.error('Template creation error:', error);
+          const errorMsg = error.errors ? error.errors.map(e => e.msg).join(', ') : error.message;
+          alert(`Failed to create template: ${errorMsg}`);
+        }
+      } catch (error) {
+        console.error('Create template error:', error);
+        alert('Failed to create template');
+      }
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="create-template-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Create New Template</h2>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        
+        <div className="modal-content">
+          <div className="form-section">
+            <h3>Template Information</h3>
+            
+            <div className="form-group">
+              <label>Template Name *</label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                placeholder="e.g., Bachelor's Degree Certificate"
+                className={errors.name ? 'error' : ''}
+              />
+              {errors.name && <span className="error-text">{errors.name}</span>}
+            </div>
+            
+            <div className="form-group">
+              <label>Document Type</label>
+              <select
+                name="type"
+                value={formData.type}
+                onChange={handleInputChange}
+              >
+                {documentTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="form-group">
+              <label>Description</label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                placeholder="Brief description of this template..."
+                rows="3"
+              />
+            </div>
+          </div>
+          
+          <div className="form-section">
+            <h3>Template Fields *</h3>
+            
+            <div className="predefined-fields">
+              <h4>Quick Add Fields:</h4>
+              <div className="field-buttons">
+                {predefinedFields.map(field => (
+                  <button
+                    key={field}
+                    type="button"
+                    className={`field-btn ${formData.fields.includes(field) ? 'selected' : ''}`}
+                    onClick={() => addField(field)}
+                    disabled={formData.fields.includes(field)}
+                  >
+                    {field}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div className="custom-field">
+              <h4>Add Custom Field:</h4>
+              <div className="custom-field-input">
+                <input
+                  type="text"
+                  value={newField}
+                  onChange={(e) => setNewField(e.target.value)}
+                  placeholder="Enter custom field name"
+                  onKeyPress={(e) => e.key === 'Enter' && addField(newField)}
+                />
+                <button
+                  type="button"
+                  onClick={() => addField(newField)}
+                  className="btn btn-secondary"
+                >
+                  Add
+                </button>
+              </div>
+            </div>
+            
+            <div className="selected-fields">
+              <h4>Selected Fields ({formData.fields.length}):</h4>
+              {formData.fields.length === 0 ? (
+                <p className="no-fields">No fields selected yet</p>
+              ) : (
+                <div className="fields-list">
+                  {formData.fields.map((field, index) => (
+                    <div key={index} className="selected-field">
+                      <span>{field}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeField(field)}
+                        className="remove-field"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {errors.fields && <span className="error-text">{errors.fields}</span>}
+            </div>
+          </div>
+        </div>
+        
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" onClick={handleSave}>
+            Create Template
+          </button>
         </div>
       </div>
     </div>

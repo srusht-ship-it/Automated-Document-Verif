@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import SidebarNavigation from '../components/SidebarNavigation';
 import HeaderBar from '../components/HeaderBar';
 import StatsCards from '../components/StatsCards';
+import Footer from '../components/Footer';
 import '../styles/theme.css';
 import '../styles/VerifierDashboard.css';
 
@@ -37,48 +39,41 @@ const VerifierDashboard = () => {
 
   const loadVerificationData = async () => {
     try {
-      // Mock data - replace with actual API calls
-      setVerificationRequests([
-        {
-          id: 1,
-          documentId: 'DOC001',
-          issuer: 'State University',
-          requestedBy: 'ABC Bank',
-          requestDate: '2024-01-15',
-          documentType: 'Degree Certificate',
-          status: 'pending'
-        },
-        {
-          id: 2,
-          documentId: 'DOC002',
-          issuer: 'City College',
-          requestedBy: 'XYZ Corp HR',
-          requestDate: '2024-01-14',
-          documentType: 'Transcript',
-          status: 'pending'
-        }
-      ]);
+      const token = localStorage.getItem('doc_verify_token');
+      
+      // Load verification queue
+      const queueResponse = await fetch('http://localhost:5000/api/verification/queue', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (queueResponse.ok) {
+        const queueData = await queueResponse.json();
+        setVerificationRequests(queueData.data.map(doc => ({
+          id: doc.id,
+          documentId: `DOC${doc.id}`,
+          issuer: doc.issuer?.firstName ? `${doc.issuer.firstName} ${doc.issuer.lastName}` : doc.issuer?.email,
+          requestedBy: doc.individual?.firstName ? `${doc.individual.firstName} ${doc.individual.lastName}` : doc.individual?.email,
+          requestDate: new Date(doc.createdAt).toLocaleDateString(),
+          documentType: doc.documentType,
+          status: doc.status
+        })));
+      }
 
-      setVerificationHistory([
-        {
-          id: 1,
-          documentId: 'DOC003',
-          issuer: 'Tech Institute',
-          verifiedFor: 'DEF Company',
-          verificationDate: '2024-01-10',
-          result: 'verified',
-          confidence: 98.5
-        },
-        {
-          id: 2,
-          documentId: 'DOC004',
-          issuer: 'Business School',
-          verifiedFor: 'GHI Bank',
-          verificationDate: '2024-01-08',
-          result: 'flagged',
-          confidence: 65.2
-        }
-      ]);
+      // Load verification history
+      const historyResponse = await fetch('http://localhost:5000/api/verification/history', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (historyResponse.ok) {
+        const historyData = await historyResponse.json();
+        setVerificationHistory(historyData.data.map(doc => ({
+          id: doc.id,
+          documentId: `DOC${doc.id}`,
+          issuer: doc.issuer?.firstName ? `${doc.issuer.firstName} ${doc.issuer.lastName}` : doc.issuer?.email,
+          verifiedFor: doc.individual?.firstName ? `${doc.individual.firstName} ${doc.individual.lastName}` : doc.individual?.email,
+          verificationDate: new Date(doc.updatedAt).toLocaleDateString(),
+          result: doc.status,
+          confidence: doc.metadata?.verification?.confidence || 0
+        })));
+      }
     } catch (error) {
       console.error('Error loading verification data:', error);
     }
@@ -115,27 +110,52 @@ const VerifierDashboard = () => {
     setVerificationResult(null);
 
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // Mock verification result
-      const mockResult = {
-        status: Math.random() > 0.3 ? 'verified' : 'flagged',
-        confidence: Math.round((Math.random() * 40 + 60) * 10) / 10,
-        documentId: documentId || `DOC${Date.now()}`,
-        issuer: 'Sample Institution',
-        documentType: 'Certificate',
-        issueDate: '2023-06-15',
-        verificationDate: new Date().toISOString().split('T')[0],
-        blockchainHash: '0x' + Math.random().toString(16).substr(2, 40),
-        aiAnalysis: {
-          textAccuracy: Math.round(Math.random() * 20 + 80),
-          formatIntegrity: Math.round(Math.random() * 15 + 85),
-          securityFeatures: Math.round(Math.random() * 25 + 75)
+      const token = localStorage.getItem('doc_verify_token');
+      
+      if (uploadedDocument) {
+        // Quick verify uploaded document
+        const formData = new FormData();
+        formData.append('document', uploadedDocument);
+        
+        const response = await fetch('http://localhost:5000/api/verification/quick-verify', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          setVerificationResult({
+            ...result.data,
+            documentId: documentId || `DOC${Date.now()}`,
+            issuer: 'Unknown',
+            documentType: 'Uploaded Document',
+            issueDate: 'Unknown',
+            verificationDate: new Date().toISOString().split('T')[0],
+            blockchainHash: '0x' + Math.random().toString(16).substr(2, 40)
+          });
+        } else {
+          throw new Error('Verification failed');
         }
-      };
-
-      setVerificationResult(mockResult);
+      } else {
+        // Verify by document ID (mock for now)
+        const mockResult = {
+          status: Math.random() > 0.3 ? 'verified' : 'flagged',
+          confidence: Math.round((Math.random() * 40 + 60) * 10) / 10,
+          documentId: documentId,
+          issuer: 'Sample Institution',
+          documentType: 'Certificate',
+          issueDate: '2023-06-15',
+          verificationDate: new Date().toISOString().split('T')[0],
+          blockchainHash: '0x' + Math.random().toString(16).substr(2, 40),
+          aiAnalysis: {
+            textAccuracy: Math.round(Math.random() * 20 + 80),
+            formatIntegrity: Math.round(Math.random() * 15 + 85),
+            securityFeatures: Math.round(Math.random() * 25 + 75)
+          }
+        };
+        setVerificationResult(mockResult);
+      }
     } catch (error) {
       console.error('Verification error:', error);
       alert('Verification failed. Please try again.');
@@ -452,6 +472,7 @@ const VerifierDashboard = () => {
         )}
           </div>
         </main>
+        <Footer />
       </div>
     </div>
   );

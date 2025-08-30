@@ -13,6 +13,10 @@ const { syncModels } = require('./models');
 const authRoutes = require('./routes/auth');
 const documentRoutes = require('./routes/documents');
 const userRoutes = require('./routes/users');
+const templateRoutes = require('./routes/templates');
+const bulkRoutes = require('./routes/bulk');
+const verificationRoutes = require('./routes/verification');
+const analyticsRoutes = require('./routes/analytics');
 
 const app = express();
 
@@ -59,6 +63,10 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/templates', templateRoutes);
+app.use('/api/bulk', bulkRoutes);
+app.use('/api/verification', verificationRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Initialize database models
 const initializeDatabase = async () => {

@@ -5,6 +5,7 @@ import HeaderBar from '../components/HeaderBar';
 import StatsCards from '../components/StatsCards';
 import DocumentUpload from '../components/DocumentUpload';
 import DocumentList from '../components/DocumentList';
+import Footer from '../components/Footer';
 import '../styles/IndividualDashboard.css';
 import '../styles/theme.css';
 
@@ -122,6 +123,7 @@ const IndividualDashboard = () => {
             )}
           </div>
         </main>
+        <Footer />
       </div>
     </div>
   );
@@ -486,13 +488,7 @@ const ProfileManagement = () => {
       <h2>Profile Management</h2>
       
       <div style={{ maxWidth: '500px' }}>
-        <div style={{
-          background: 'white',
-          padding: '24px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          marginBottom: '20px'
-        }}>
+        <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
           <h3 style={{ marginBottom: '20px' }}>Personal Information</h3>
           
           <div style={{ marginBottom: '16px' }}>
@@ -573,14 +569,7 @@ const ProfileManagement = () => {
               <>
                 <button
                   onClick={handleSave}
-                  style={{
-                    padding: '10px 20px',
-                    background: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
+                  className="btn btn-primary"
                 >
                   ✅ Save Changes
                 </button>
@@ -589,14 +578,7 @@ const ProfileManagement = () => {
                     setEditing(false);
                     loadUserProfile();
                   }}
-                  style={{
-                    padding: '10px 20px',
-                    background: '#6b7280',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer'
-                  }}
+                  className="btn btn-secondary"
                 >
                   ❌ Cancel
                 </button>
@@ -604,14 +586,7 @@ const ProfileManagement = () => {
             ) : (
               <button
                 onClick={() => setEditing(true)}
-                style={{
-                  padding: '10px 20px',
-                  background: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
+                className="btn btn-primary"
               >
                 ✏️ Edit Profile
               </button>
@@ -619,12 +594,7 @@ const ProfileManagement = () => {
           </div>
         </div>
 
-        <div style={{
-          background: 'white',
-          padding: '24px',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}>
+        <div className="card">
           <h3 style={{ marginBottom: '16px' }}>Account Actions</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '4px', fontSize: '14px' }}>
@@ -635,15 +605,7 @@ const ProfileManagement = () => {
             </div>
             <button
               onClick={handleLogout}
-              style={{
-                padding: '12px 20px',
-                background: '#ef4444',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontWeight: '500'
-              }}
+              className="btn btn-danger"
             >
               🚪 Logout
             </button>
