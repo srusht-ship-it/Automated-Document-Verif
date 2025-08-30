@@ -19,8 +19,8 @@ const VerifierDashboard = () => {
   const [documentId, setDocumentId] = useState('');
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('doc_verify_user');
+    const token = localStorage.getItem('doc_verify_token');
     
     if (!userData || !token) {
       navigate('/login');
@@ -166,22 +166,34 @@ const VerifierDashboard = () => {
 
   const handleRequest = async (requestId, action) => {
     try {
-      // Update request status
-      setVerificationRequests(prev => 
-        prev.map(req => 
-          req.id === requestId 
-            ? { ...req, status: action === 'accept' ? 'processing' : 'rejected' }
-            : req
-        )
-      );
+      const token = localStorage.getItem('doc_verify_token');
+      const status = action === 'accept' ? 'verified' : 'rejected';
+      const notes = action === 'accept' ? 'Document verified by verifier' : 'Document rejected by verifier';
       
-      if (action === 'accept') {
-        alert('Verification request accepted. Processing...');
+      const response = await fetch(`http://localhost:5000/api/verification/${requestId}/verify`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status, notes })
+      });
+      
+      if (response.ok) {
+        // Remove from requests and add to history
+        setVerificationRequests(prev => prev.filter(req => req.id !== requestId));
+        
+        // Refresh verification data
+        loadVerificationData();
+        
+        alert(`Document ${action === 'accept' ? 'verified' : 'rejected'} successfully!`);
       } else {
-        alert('Verification request rejected.');
+        const error = await response.json();
+        alert(`Failed to ${action} document: ${error.message}`);
       }
     } catch (error) {
       console.error('Error handling request:', error);
+      alert(`Failed to ${action} document`);
     }
   };
 
@@ -219,7 +231,7 @@ const VerifierDashboard = () => {
               <div className="tab-content">
                 <h2 className="section-title">Dashboard Overview</h2>
                 <StatsCards userRole="verifier" />
-                <VerifierOverview />
+                <VerifierOverview onTabChange={setActiveTab} />
               </div>
             )}
 
@@ -468,6 +480,10 @@ const VerifierDashboard = () => {
                 ))}
               </div>
             )}
+
+            {activeTab === 'profile' && (
+              <ProfileManagement />
+            )}
           </div>
         )}
           </div>
@@ -479,16 +495,35 @@ const VerifierDashboard = () => {
 };
 
 // Verifier Overview Component
-const VerifierOverview = () => {
+const VerifierOverview = ({ onTabChange }) => {
+  const generateReport = () => {
+    alert('Report generation feature coming soon!');
+  };
+
   return (
     <div className="verifier-overview">
       <div className="grid-2">
         <div className="card">
           <h3>Quick Actions</h3>
           <div className="quick-actions">
-            <button className="btn btn-primary">🔍 Quick Verify</button>
-            <button className="btn btn-secondary">📋 View Queue</button>
-            <button className="btn btn-secondary">📄 Generate Report</button>
+            <button 
+              className="btn btn-primary"
+              onClick={() => onTabChange('verify')}
+            >
+              🔍 Quick Verify
+            </button>
+            <button 
+              className="btn btn-secondary"
+              onClick={() => onTabChange('queue')}
+            >
+              📋 View Queue
+            </button>
+            <button 
+              className="btn btn-secondary"
+              onClick={generateReport}
+            >
+              📄 Generate Report
+            </button>
           </div>
         </div>
         
@@ -509,6 +544,189 @@ const VerifierOverview = () => {
                 <small>3 hours ago</small>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Profile Management Component (reused from IndividualDashboard)
+const ProfileManagement = () => {
+  const [user, setUser] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [formData, setFormData] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadUserProfile();
+  }, []);
+
+  const loadUserProfile = () => {
+    const userData = localStorage.getItem('doc_verify_user');
+    if (userData) {
+      const parsedUser = JSON.parse(userData);
+      setUser(parsedUser);
+      setFormData({
+        firstName: parsedUser.firstName || '',
+        lastName: parsedUser.lastName || '',
+        email: parsedUser.email || '',
+        organization: parsedUser.organization || ''
+      });
+    }
+    setLoading(false);
+  };
+
+  const handleInputChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSave = async () => {
+    try {
+      const token = localStorage.getItem('doc_verify_token');
+      const response = await fetch('http://localhost:5000/api/users/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const updatedUser = { ...user, ...data.data };
+        localStorage.setItem('doc_verify_user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        setEditing(false);
+        alert('Profile updated successfully!');
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to update profile: ${errorData.message}`);
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('Failed to update profile');
+    }
+  };
+
+  const handleLogout = () => {
+    if (confirm('Are you sure you want to logout?')) {
+      localStorage.removeItem('doc_verify_token');
+      localStorage.removeItem('doc_verify_user');
+      window.location.href = '/';
+    }
+  };
+
+  if (loading) {
+    return <div style={{ textAlign: 'center', padding: '40px' }}>Loading...</div>;
+  }
+
+  return (
+    <div className="tab-content">
+      <h2>Profile Management</h2>
+      
+      <div style={{ maxWidth: '500px' }}>
+        <div className="card" style={{ marginBottom: 'var(--spacing-lg)' }}>
+          <h3 style={{ marginBottom: '20px' }}>Personal Information</h3>
+          
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontWeight: '500', marginBottom: '4px' }}>First Name:</label>
+            {editing ? (
+              <input
+                type="text"
+                name="firstName"
+                value={formData.firstName}
+                onChange={handleInputChange}
+                className="input"
+              />
+            ) : (
+              <div style={{ padding: '8px', background: '#f8f9fa', borderRadius: '4px' }}>
+                {user?.firstName || 'Not set'}
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontWeight: '500', marginBottom: '4px' }}>Last Name:</label>
+            {editing ? (
+              <input
+                type="text"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleInputChange}
+                className="input"
+              />
+            ) : (
+              <div style={{ padding: '8px', background: '#f8f9fa', borderRadius: '4px' }}>
+                {user?.lastName || 'Not set'}
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontWeight: '500', marginBottom: '4px' }}>Email:</label>
+            <div style={{ padding: '8px', background: '#f8f9fa', borderRadius: '4px', color: '#666' }}>
+              {user?.email} (cannot be changed)
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', fontWeight: '500', marginBottom: '4px' }}>Organization:</label>
+            {editing ? (
+              <input
+                type="text"
+                name="organization"
+                value={formData.organization}
+                onChange={handleInputChange}
+                className="input"
+              />
+            ) : (
+              <div style={{ padding: '8px', background: '#f8f9fa', borderRadius: '4px' }}>
+                {user?.organization || 'Not set'}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px' }}>
+            {editing ? (
+              <>
+                <button onClick={handleSave} className="btn btn-primary">
+                  ✅ Save Changes
+                </button>
+                <button
+                  onClick={() => {
+                    setEditing(false);
+                    loadUserProfile();
+                  }}
+                  className="btn btn-secondary"
+                >
+                  ❌ Cancel
+                </button>
+              </>
+            ) : (
+              <button onClick={() => setEditing(true)} className="btn btn-primary">
+                ✏️ Edit Profile
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="card">
+          <h3 style={{ marginBottom: '16px' }}>Account Actions</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '4px', fontSize: '14px' }}>
+              🔒 <strong>Account Type:</strong> {user?.role || 'Verifier'}
+            </div>
+            <div style={{ padding: '12px', background: '#f8f9fa', borderRadius: '4px', fontSize: '14px' }}>
+              📅 <strong>Member Since:</strong> {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}
+            </div>
+            <button onClick={handleLogout} className="btn btn-danger">
+              🚪 Logout
+            </button>
           </div>
         </div>
       </div>

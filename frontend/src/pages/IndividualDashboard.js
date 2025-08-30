@@ -263,18 +263,51 @@ const ShareDocuments = ({ refreshTrigger }) => {
   const fetchDocuments = async () => {
     try {
       const token = localStorage.getItem('doc_verify_token');
-      const response = await fetch('http://localhost:5000/api/documents', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
       
-      if (response.ok) {
-        const data = await response.json();
-        setDocuments(data.data.documents.filter(doc => doc.status === 'verified'));
-      }
+      // Load both uploaded and received documents
+      const [uploadedResponse, receivedResponse] = await Promise.all([
+        fetch('http://localhost:5000/api/documents', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('http://localhost:5000/api/documents/received', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+      
+      const uploadedData = uploadedResponse.ok ? await uploadedResponse.json() : { data: { documents: [] } };
+      const receivedData = receivedResponse.ok ? await receivedResponse.json() : { data: [] };
+      
+      const allDocs = [
+        ...(uploadedData.data.documents || []).map(doc => ({ ...doc, source: 'uploaded' })),
+        ...(receivedData.data || []).map(doc => ({ ...doc, source: 'received' }))
+      ];
+      
+      setDocuments(allDocs.filter(doc => doc.status === 'verified'));
     } catch (error) {
       console.error('Error fetching documents:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const requestVerification = async (documentId) => {
+    try {
+      const token = localStorage.getItem('doc_verify_token');
+      const response = await fetch(`http://localhost:5000/api/issuance/${documentId}/request-verification`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        alert('Verification requested successfully!');
+        fetchDocuments(); // Refresh documents
+      } else {
+        const error = await response.json();
+        alert(`Failed to request verification: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Error requesting verification:', error);
+      alert('Failed to request verification');
     }
   };
 

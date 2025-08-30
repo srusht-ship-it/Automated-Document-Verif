@@ -7,6 +7,7 @@ import DocumentList from '../components/DocumentList';
 import Footer from '../components/Footer';
 import '../styles/theme.css';
 import '../styles/IssuerDashboard.css';
+import '../styles/IssuanceStyles.css';
 
 const IssuerDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -97,6 +98,7 @@ const DocumentTemplates = () => {
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateTemplate, setShowCreateTemplate] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState(null);
 
   useEffect(() => {
     fetchTemplates();
@@ -119,6 +121,40 @@ const DocumentTemplates = () => {
       console.error('Error fetching templates:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEdit = (template) => {
+    setEditingTemplate(template);
+    setShowCreateTemplate(true);
+  };
+
+  const handleUse = (template) => {
+    alert(`Using template: ${template.name}\nThis would open the document creation form with pre-filled fields.`);
+  };
+
+  const handleDelete = async (templateId) => {
+    if (!confirm('Are you sure you want to delete this template?')) return;
+    
+    try {
+      const token = localStorage.getItem('doc_verify_token');
+      const response = await fetch(`http://localhost:5000/api/templates/${templateId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        setTemplates(prev => prev.filter(t => t.id !== templateId));
+        alert('Template deleted successfully!');
+      } else {
+        const error = await response.json();
+        alert(`Failed to delete template: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Delete template error:', error);
+      alert('Failed to delete template');
     }
   };
 
@@ -173,9 +209,24 @@ const DocumentTemplates = () => {
                 </div>
 
                 <div className="template-actions">
-                  <button className="action-btn primary">📝 Edit</button>
-                  <button className="action-btn secondary">📄 Use</button>
-                  <button className="action-btn tertiary">🗑️ Delete</button>
+                  <button 
+                    className="action-btn primary"
+                    onClick={() => handleEdit(template)}
+                  >
+                    📝 Edit
+                  </button>
+                  <button 
+                    className="action-btn secondary"
+                    onClick={() => handleUse(template)}
+                  >
+                    📄 Use
+                  </button>
+                  <button 
+                    className="action-btn tertiary"
+                    onClick={() => handleDelete(template.id)}
+                  >
+                    🗑️ Delete
+                  </button>
                 </div>
               </div>
             ))
@@ -185,10 +236,19 @@ const DocumentTemplates = () => {
 
       {showCreateTemplate && (
         <CreateTemplateModal 
-          onClose={() => setShowCreateTemplate(false)}
-          onSave={(newTemplate) => {
-            setTemplates(prev => [...prev, newTemplate]);
+          template={editingTemplate}
+          onClose={() => {
             setShowCreateTemplate(false);
+            setEditingTemplate(null);
+          }}
+          onSave={(template) => {
+            if (editingTemplate) {
+              setTemplates(prev => prev.map(t => t.id === template.id ? template : t));
+            } else {
+              setTemplates(prev => [...prev, template]);
+            }
+            setShowCreateTemplate(false);
+            setEditingTemplate(null);
           }}
         />
       )}
@@ -317,11 +377,205 @@ const IssuerOverview = () => {
 
 // Document Issuance Panel Component
 const DocumentIssuancePanel = ({ onUploadSuccess }) => {
+  const [activeMode, setActiveMode] = useState('issue');
+  
   return (
     <div className="document-issuance">
-      <div className="card">
-        <DocumentUpload onUploadSuccess={onUploadSuccess} />
+      <div className="issuance-tabs">
+        <button 
+          className={`tab-btn ${activeMode === 'issue' ? 'active' : ''}`}
+          onClick={() => setActiveMode('issue')}
+        >
+          📜 Issue to Individual
+        </button>
+        <button 
+          className={`tab-btn ${activeMode === 'upload' ? 'active' : ''}`}
+          onClick={() => setActiveMode('upload')}
+        >
+          📤 Upload Document
+        </button>
       </div>
+      
+      {activeMode === 'issue' ? (
+        <IssueDocumentForm />
+      ) : (
+        <div className="card">
+          <DocumentUpload onUploadSuccess={onUploadSuccess} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Issue Document Form Component
+const IssueDocumentForm = () => {
+  const [formData, setFormData] = useState({
+    individualEmail: '',
+    templateId: '',
+    documentName: '',
+    documentType: 'Educational',
+    documentData: {}
+  });
+  const [templates, setTemplates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, []);
+
+  const fetchTemplates = async () => {
+    try {
+      const token = localStorage.getItem('doc_verify_token');
+      const response = await fetch('http://localhost:5000/api/templates', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTemplates(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+    }
+  };
+
+  const handleTemplateChange = (templateId) => {
+    const template = templates.find(t => t.id === parseInt(templateId));
+    setSelectedTemplate(template);
+    setFormData(prev => ({ ...prev, templateId }));
+  };
+
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      documentData: {
+        ...prev.documentData,
+        [field]: value
+      }
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const token = localStorage.getItem('doc_verify_token');
+      const response = await fetch('http://localhost:5000/api/issuance/issue', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...formData,
+          documentData: {
+            ...formData.documentData,
+            name: formData.documentName,
+            type: formData.documentType
+          }
+        })
+      });
+
+      if (response.ok) {
+        alert('Document issued successfully!');
+        setFormData({
+          individualEmail: '',
+          templateId: '',
+          documentName: '',
+          documentType: 'Educational',
+          documentData: {}
+        });
+        setSelectedTemplate(null);
+      } else {
+        const error = await response.json();
+        alert(`Failed to issue document: ${error.message}`);
+      }
+    } catch (error) {
+      console.error('Issue document error:', error);
+      alert('Failed to issue document');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="card">
+      <h3>📜 Issue Document to Individual</h3>
+      <form onSubmit={handleSubmit} className="issue-form">
+        <div className="form-group">
+          <label>Individual Email *</label>
+          <input
+            type="email"
+            value={formData.individualEmail}
+            onChange={(e) => setFormData(prev => ({ ...prev, individualEmail: e.target.value }))}
+            placeholder="Enter individual's email address"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Document Name *</label>
+          <input
+            type="text"
+            value={formData.documentName}
+            onChange={(e) => setFormData(prev => ({ ...prev, documentName: e.target.value }))}
+            placeholder="e.g., Bachelor's Degree Certificate"
+            required
+          />
+        </div>
+
+        <div className="form-group">
+          <label>Document Type</label>
+          <select
+            value={formData.documentType}
+            onChange={(e) => setFormData(prev => ({ ...prev, documentType: e.target.value }))}
+          >
+            <option value="Educational">Educational</option>
+            <option value="Professional">Professional</option>
+            <option value="Government">Government</option>
+            <option value="Medical">Medical</option>
+            <option value="Legal">Legal</option>
+            <option value="Financial">Financial</option>
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>Template (Optional)</label>
+          <select
+            value={formData.templateId}
+            onChange={(e) => handleTemplateChange(e.target.value)}
+          >
+            <option value="">No template</option>
+            {templates.map(template => (
+              <option key={template.id} value={template.id}>
+                {template.name} ({template.type})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedTemplate && (
+          <div className="template-fields">
+            <h4>Template Fields:</h4>
+            {selectedTemplate.fields.map(field => (
+              <div key={field} className="form-group">
+                <label>{field}</label>
+                <input
+                  type="text"
+                  value={formData.documentData[field] || ''}
+                  onChange={(e) => handleFieldChange(field, e.target.value)}
+                  placeholder={`Enter ${field}`}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button type="submit" className="btn btn-primary" disabled={loading}>
+          {loading ? '⏳ Issuing...' : '📜 Issue Document'}
+        </button>
+      </form>
     </div>
   );
 };
@@ -515,12 +769,12 @@ const BulkUploadInterface = () => {
 };
 
 // Create Template Modal Component
-const CreateTemplateModal = ({ onClose, onSave }) => {
+const CreateTemplateModal = ({ template, onClose, onSave }) => {
   const [formData, setFormData] = useState({
-    name: '',
-    type: 'Educational',
-    description: '',
-    fields: []
+    name: template?.name || '',
+    type: template?.type || 'Educational',
+    description: template?.description || '',
+    fields: template?.fields || []
   });
   const [newField, setNewField] = useState('');
   const [errors, setErrors] = useState({});
@@ -589,8 +843,13 @@ const CreateTemplateModal = ({ onClose, onSave }) => {
       try {
         console.log('Sending template data:', formData);
         const token = localStorage.getItem('doc_verify_token');
-        const response = await fetch('http://localhost:5000/api/templates', {
-          method: 'POST',
+        const isEditing = !!template;
+        const url = isEditing 
+          ? `http://localhost:5000/api/templates/${template.id}`
+          : 'http://localhost:5000/api/templates';
+        
+        const response = await fetch(url, {
+          method: isEditing ? 'PUT' : 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
@@ -618,7 +877,7 @@ const CreateTemplateModal = ({ onClose, onSave }) => {
     <div className="modal-overlay" onClick={onClose}>
       <div className="create-template-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Create New Template</h2>
+          <h2>{template ? 'Edit Template' : 'Create New Template'}</h2>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
         
@@ -734,7 +993,7 @@ const CreateTemplateModal = ({ onClose, onSave }) => {
             Cancel
           </button>
           <button className="btn btn-primary" onClick={handleSave}>
-            Create Template
+            {template ? 'Update Template' : 'Create Template'}
           </button>
         </div>
       </div>

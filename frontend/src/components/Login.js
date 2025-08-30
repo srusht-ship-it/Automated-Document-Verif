@@ -1,7 +1,7 @@
 // frontend/src/components/Login.js
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import authService from '../services/auth';
+import apiClient from '../utils/api';
 import './login.css';
 
 const Login = ({ onLogin }) => {
@@ -80,8 +80,8 @@ const Login = ({ onLogin }) => {
         password: formData.password
       };
 
-      // Call authentication service
-      const response = await authService.login(loginData);
+      // Call authentication service with CSRF protection
+      const response = await apiClient.login(loginData.email, loginData.password);
       
       if (response.success) {
         // Check if onLogin prop is provided and is a function
@@ -91,14 +91,8 @@ const Login = ({ onLogin }) => {
           // Fallback: handle login locally and redirect
           console.log('Login successful:', response.data);
           
-          // Store authentication data
-          localStorage.setItem('doc_verify_token', response.data.token);
+          // Store authentication data (tokens already stored by apiClient)
           localStorage.setItem('doc_verify_user', JSON.stringify(response.data.user));
-          
-          // Update auth service state if it has a method for this
-          if (authService.setToken) {
-            authService.setToken(response.data.token);
-          }
           
           // Navigate based on user role
           const userRole = response.data.user.role;

@@ -10,6 +10,9 @@ const HomePage = () => {
   const handleTryDashboard = () => {
     if (authService.isAuthenticated()) {
       const userRole = authService.getUserRole();
+      console.log('User role:', userRole);
+      console.log('User data:', authService.getCurrentUser());
+      
       switch (userRole) {
         case 'issuer':
           navigate('/issuer-dashboard');
@@ -21,6 +24,7 @@ const HomePage = () => {
           navigate('/verifier-dashboard');
           break;
         default:
+          console.log('Unknown role, navigating to default dashboard');
           navigate('/dashboard');
       }
     } else {

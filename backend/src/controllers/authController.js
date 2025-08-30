@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { User } = require('../models');
+const { generateCSRFToken } = require('../middleware/security');
 require('dotenv').config();
 
 // Generate JWT token
@@ -43,13 +44,15 @@ const register = async (req, res) => {
 
     // Generate token
     const token = generateToken(user.id);
+    const csrfToken = generateCSRFToken(token);
 
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
       data: {
         user: user.toSafeObject(),
-        token
+        token,
+        csrfToken
       }
     });
 
@@ -96,13 +99,15 @@ const login = async (req, res) => {
 
     // Generate token
     const token = generateToken(user.id);
+    const csrfToken = generateCSRFToken(token);
 
     res.status(200).json({
       success: true,
       message: 'Login successful',
       data: {
         user: user.toSafeObject(),
-        token
+        token,
+        csrfToken
       }
     });
 

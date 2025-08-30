@@ -3,11 +3,25 @@ const { Document, User } = require('../models');
 // Get verification queue for verifier
 const getVerificationQueue = async (req, res) => {
   try {
+    const { Op } = require('sequelize');
     const documents = await Document.findAll({
-      where: { status: 'pending' },
+      where: { 
+        status: 'pending',
+        individualId: { [Op.ne]: null }
+      },
       include: [
-        { model: User, as: 'issuer', attributes: ['id', 'email', 'firstName', 'lastName'] },
-        { model: User, as: 'individual', attributes: ['id', 'email', 'firstName', 'lastName'] }
+        { 
+          model: User, 
+          as: 'issuer', 
+          attributes: ['id', 'email', 'firstName', 'lastName'],
+          required: false
+        },
+        { 
+          model: User, 
+          as: 'individual', 
+          attributes: ['id', 'email', 'firstName', 'lastName'],
+          required: true
+        }
       ],
       order: [['createdAt', 'ASC']]
     });

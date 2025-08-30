@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import apiClient from '../utils/api';
 import '../styles/DocumentUpload.css';
 
 const DocumentUpload = ({ onUploadSuccess }) => {
@@ -20,41 +21,29 @@ const DocumentUpload = ({ onUploadSuccess }) => {
     const results = [];
     
     try {
-      const token = localStorage.getItem('doc_verify_token');
-      if (!token) {
-        alert('Please login first');
-        return;
-      }
-
-      // Upload each file
+      // Upload each file using secure API client
       for (const file of files) {
         const formData = new FormData();
         formData.append('document', file);
         formData.append('documentType', 'other');
         formData.append('description', `Uploaded via dashboard: ${file.name}`);
 
-        const response = await fetch('http://localhost:5000/api/documents/upload', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formData
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          results.push({
-            name: file.name,
-            size: file.size,
-            type: file.type,
-            status: 'uploaded',
-            id: data.data.document.id,
-            documentType: data.data.document.documentType
-          });
-        } else {
-          const errorData = await response.json();
-          console.error('Upload failed:', errorData);
-          alert(`Failed to upload ${file.name}: ${errorData.message}`);
+        try {
+          const data = await apiClient.uploadFile('/documents/upload', formData);
+          
+          if (data.success) {
+            results.push({
+              name: file.name,
+              size: file.size,
+              type: file.type,
+              status: 'uploaded',
+              id: data.data.document.id,
+              documentType: data.data.document.documentType
+            });
+          }
+        } catch (uploadError) {
+          console.error('Upload failed:', uploadError);
+          alert(`Failed to upload ${file.name}: ${uploadError.message}`);
         }
       }
 

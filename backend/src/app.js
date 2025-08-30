@@ -5,6 +5,16 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 require('dotenv').config();
 
+// Import security middleware
+const { 
+  csrfProtection, 
+  protectFileAccess, 
+  sanitizeInput, 
+  validateFileUpload, 
+  limitRequestSize, 
+  securityHeaders 
+} = require('./middleware/security');
+
 // Import database and models
 const { sequelize, testConnection } = require('./config/database');
 const { syncModels } = require('./models');
@@ -21,7 +31,29 @@ const analyticsRoutes = require('./routes/analytics');
 const app = express();
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      fontSrc: ["'self'"],
+      connectSrc: ["'self'"],
+      frameAncestors: ["'none'"]
+    }
+  },
+  crossOriginEmbedderPolicy: false
+}));
+
+// Additional security headers
+app.use(securityHeaders);
+
+// Request size limiting
+app.use(limitRequestSize);
+
+// Input sanitization
+app.use(sanitizeInput);
 
 // Rate limiting
 const limiter = rateLimit({
@@ -42,12 +74,30 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
-// Body parser middleware
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Body parser middleware with security limits
+app.use(express.json({ 
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    // Store raw body for signature verification if needed
+    req.rawBody = buf;
+  }
+}));
+app.use(express.urlencoded({ 
+  extended: true, 
+  limit: '10mb',
+  parameterLimit: 100
+}));
 
-// Static files for uploads
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Protected static files for uploads
+app.use('/uploads', protectFileAccess, express.static(path.join(__dirname, '../uploads'), {
+  dotfiles: 'deny',
+  index: false,
+  setHeaders: (res, path) => {
+    // Prevent execution of uploaded files
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', 'attachment');
+  }
+}));
 
 // Routes
 app.get('/api/health', (req, res) => {
@@ -57,6 +107,15 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString(),
     version: '1.0.0'
   });
+});
+
+// CSRF Protection for state-changing operations
+app.use('/api', (req, res, next) => {
+  // Skip CSRF for auth routes (login/register) and GET requests
+  if (req.path.startsWith('/auth') || req.method === 'GET') {
+    return next();
+  }
+  return csrfProtection(req, res, next);
 });
 
 // API Routes
@@ -72,7 +131,8 @@ app.use('/api/analytics', analyticsRoutes);
 const initializeDatabase = async () => {
   try {
     await testConnection();
-    await syncModels();
+    // Force sync to create missing tables
+    await sequelize.sync({ alter: true });
     console.log('✅ Database models synchronized');
   } catch (error) {
     console.error('❌ Database initialization failed:', error);

@@ -19,28 +19,67 @@ const DocumentList = () => {
   const loadDocuments = async () => {
     try {
       const token = localStorage.getItem('doc_verify_token');
-      const response = await fetch('http://localhost:5000/api/documents', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const user = JSON.parse(localStorage.getItem('doc_verify_user') || '{}');
+      
+      let response;
+      if (user.role === 'issuer') {
+        // Load issued documents for issuer
+        response = await fetch('http://localhost:5000/api/documents/issued', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      } else {
+        // Load both uploaded and received documents for individual
+        const [uploadedResponse, receivedResponse] = await Promise.all([
+          fetch('http://localhost:5000/api/documents', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }),
+          fetch('http://localhost:5000/api/documents/received', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+        ]);
+        
+        const uploadedData = uploadedResponse.ok ? await uploadedResponse.json() : { data: [] };
+        const receivedData = receivedResponse.ok ? await receivedResponse.json() : { data: [] };
+        
+        const allDocs = [
+          ...(uploadedData.data?.documents || []).map(doc => ({ ...doc, source: 'uploaded' })),
+          ...(receivedData.data || []).map(doc => ({ ...doc, source: 'received' }))
+        ];
+        
+        const mappedDocs = allDocs.map(doc => ({
+          id: doc.id,
+          originalName: doc.originalName,
+          mimeType: doc.mimeType,
+          fileSize: doc.metadata?.fileSize || 0,
+          uploadDate: doc.uploadedAt || doc.createdAt,
+          verificationStatus: doc.status,
+          extractedText: doc.extractedTextPreview,
+          fileHash: doc.hash || 'N/A',
+          documentType: doc.documentType,
+          issuer: doc.issuer?.firstName ? `${doc.issuer.firstName} ${doc.issuer.lastName}` : doc.issuer?.email,
+          verificationDate: doc.updatedAt,
+          source: doc.source
+        }));
+        setDocuments(mappedDocs);
+        return;
+      }
 
       if (response.ok) {
         const data = await response.json();
-        const docs = data.data?.documents || [];
-        // Map backend response to component format
+        const docs = data.data || [];
         const mappedDocs = docs.map(doc => ({
           id: doc.id,
           originalName: doc.originalName,
           mimeType: doc.mimeType,
           fileSize: doc.metadata?.fileSize || 0,
-          uploadDate: doc.uploadedAt,
+          uploadDate: doc.uploadedAt || doc.createdAt,
           verificationStatus: doc.status,
           extractedText: doc.extractedTextPreview,
           fileHash: doc.hash || 'N/A',
           documentType: doc.documentType,
-          issuer: doc.issuer,
-          verificationDate: doc.updatedAt
+          issuer: user.role === 'issuer' ? 'You' : (doc.individual?.firstName ? `${doc.individual.firstName} ${doc.individual.lastName}` : doc.individual?.email),
+          verificationDate: doc.updatedAt,
+          source: user.role === 'issuer' ? 'issued' : 'uploaded'
         }));
         setDocuments(mappedDocs);
       } else {

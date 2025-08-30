@@ -1,5 +1,6 @@
 const express = require('express');
 const { body, validationResult, query } = require('express-validator');
+const path = require('path');
 const { 
   uploadDocument, 
   getDocuments, 
@@ -11,6 +12,7 @@ const {
 } = require('../controllers/documentController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 const { handleFileUpload, validateFileExists } = require('../middleware/upload');
+const { validateFileUpload, protectFileAccess, sanitizePath } = require('../middleware/security');
 
 const router = express.Router();
 
@@ -76,11 +78,56 @@ router.post('/upload',
   authenticateToken,
   requireRole(['issuer', 'individual']),
   handleFileUpload,
+  validateFileUpload,
   validateFileExists,
   uploadValidation,
   handleValidationErrors,
   uploadDocument
 );
+
+/**
+ * GET /api/documents/issued
+ * Get issued documents (for issuers)
+ */
+router.get('/issued', authenticateToken, async (req, res) => {
+  try {
+    const { Document, User } = require('../models');
+    const documents = await Document.findAll({
+      where: { issuerId: req.user.id },
+      include: [{
+        model: User,
+        as: 'individual',
+        attributes: ['id', 'firstName', 'lastName', 'email']
+      }],
+      order: [['createdAt', 'DESC']]
+    });
+    res.json({ success: true, data: documents });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch issued documents' });
+  }
+});
+
+/**
+ * GET /api/documents/received
+ * Get received documents (for individuals)
+ */
+router.get('/received', authenticateToken, async (req, res) => {
+  try {
+    const { Document, User } = require('../models');
+    const documents = await Document.findAll({
+      where: { individualId: req.user.id },
+      include: [{
+        model: User,
+        as: 'issuer',
+        attributes: ['id', 'firstName', 'lastName', 'email', 'organization']
+      }],
+      order: [['createdAt', 'DESC']]
+    });
+    res.json({ success: true, data: documents });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch received documents' });
+  }
+});
 
 /**
  * GET /api/documents
@@ -172,12 +219,28 @@ router.get('/:id/download',
         });
       }
 
-      // Set headers for file download
-      res.setHeader('Content-Disposition', `attachment; filename="${document.originalName}"`);
+      // Validate and sanitize file path
+      let sanitizedPath;
+      try {
+        sanitizedPath = sanitizePath(document.filePath);
+      } catch (error) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid file path'
+        });
+      }
+
+      // Sanitize filename for download
+      const sanitizedFilename = document.originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      
+      // Set secure headers for file download
+      res.setHeader('Content-Disposition', `attachment; filename="${sanitizedFilename}"`);
       res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
       // Send file
-      res.sendFile(document.filePath, (err) => {
+      res.sendFile(sanitizedPath, (err) => {
         if (err) {
           console.error('File download error:', err);
           if (!res.headersSent) {

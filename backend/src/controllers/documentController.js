@@ -26,9 +26,12 @@ const uploadDocument = async (req, res) => {
 
     // Determine recipient based on user role and provided email
     let recipient;
+    let actualIssuerId = issuer.id;
+    
     if (issuer.role === 'individual' && !recipientEmail) {
-      // Individual uploading for themselves
+      // Individual uploading for themselves - set issuer to null so it appears in verifier queue
       recipient = issuer;
+      actualIssuerId = null;
     } else if (recipientEmail) {
       // Find specified recipient
       recipient = await User.findOne({ where: { email: recipientEmail } });
@@ -83,7 +86,7 @@ const uploadDocument = async (req, res) => {
       originalName: req.fileInfo.originalName,
       filePath: req.fileInfo.path,
       hash: fileHash,
-      issuerId: issuer.id,
+      issuerId: actualIssuerId,
       individualId: recipient.id,
       documentTypeId: null, // We'll add document types later
       status: 'pending',

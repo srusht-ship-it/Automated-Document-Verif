@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { sanitizePath } = require('./security');
 
 // Ensure upload directories exist
 const createUploadDirs = () => {
@@ -23,46 +24,82 @@ createUploadDirs();
 // Configure storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, '../../uploads/documents');
-    cb(null, uploadPath);
+    try {
+      const uploadPath = sanitizePath(path.join(__dirname, '../../uploads/documents'));
+      cb(null, uploadPath);
+    } catch (error) {
+      cb(new Error('Invalid upload destination'), null);
+    }
   },
   filename: (req, file, cb) => {
-    // Generate unique filename with timestamp and random string
-    const timestamp = Date.now();
-    const randomString = crypto.randomBytes(6).toString('hex');
-    const extension = path.extname(file.originalname);
-    const filename = `doc_${timestamp}_${randomString}${extension}`;
-    cb(null, filename);
+    try {
+      // Sanitize original filename
+      const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+      
+      // Generate unique filename with timestamp and random string
+      const timestamp = Date.now();
+      const randomString = crypto.randomBytes(6).toString('hex');
+      const extension = path.extname(sanitizedName).toLowerCase();
+      
+      // Validate extension
+      const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png'];
+      if (!allowedExtensions.includes(extension)) {
+        return cb(new Error('Invalid file extension'), null);
+      }
+      
+      const filename = `doc_${timestamp}_${randomString}${extension}`;
+      cb(null, filename);
+    } catch (error) {
+      cb(new Error('Filename generation failed'), null);
+    }
   }
 });
 
-// File filter function
+// Enhanced file filter function
 const fileFilter = (req, file, cb) => {
-  // Allowed file types
-  const allowedTypes = [
-    'image/jpeg',
-    'image/jpg', 
-    'image/png',
-    'application/pdf'
-  ];
+  try {
+    // Allowed file types
+    const allowedTypes = [
+      'image/jpeg',
+      'image/jpg', 
+      'image/png',
+      'application/pdf'
+    ];
 
-  // Allowed extensions
-  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.pdf'];
-  const fileExtension = path.extname(file.originalname).toLowerCase();
+    // Allowed extensions
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.pdf'];
+    const fileExtension = path.extname(file.originalname).toLowerCase();
 
-  if (allowedTypes.includes(file.mimetype) && allowedExtensions.includes(fileExtension)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file type. Only JPG, PNG, and PDF files are allowed.'), false);
+    // Check for null bytes in filename
+    if (file.originalname.includes('\0')) {
+      return cb(new Error('Invalid filename detected'), false);
+    }
+
+    // Check for path traversal attempts in filename
+    if (file.originalname.includes('..') || file.originalname.includes('/') || file.originalname.includes('\\')) {
+      return cb(new Error('Path traversal attempt detected in filename'), false);
+    }
+
+    // Validate MIME type and extension match
+    if (allowedTypes.includes(file.mimetype) && allowedExtensions.includes(fileExtension)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPG, PNG, and PDF files are allowed.'), false);
+    }
+  } catch (error) {
+    cb(new Error('File validation failed'), false);
   }
 };
 
-// Configure multer
+// Configure multer with enhanced security
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit to match frontend
-    files: 1 // Single file upload
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+    files: 1, // Single file upload
+    fields: 10, // Limit number of fields
+    fieldNameSize: 100, // Limit field name size
+    fieldSize: 1024 * 1024 // 1MB field size limit
   },
   fileFilter: fileFilter
 });

@@ -1,0 +1,90 @@
+/* Document Issuance Styles */
+.issuance-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.issuance-tabs .tab-btn {
+  padding: 12px 20px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-weight: 500;
+  color: #6b7280;
+  transition: all 0.2s;
+}
+
+.issuance-tabs .tab-btn.active {
+  color: var(--primary-color);
+  border-bottom-color: var(--primary-color);
+}
+
+.issue-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.issue-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.issue-form label {
+  font-weight: 500;
+  color: #374151;
+}
+
+.issue-form input,
+.issue-form select,
+.issue-form textarea {
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.issue-form input:focus,
+.issue-form select:focus,
+.issue-form textarea:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.template-fields {
+  background: #f9fafb;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.template-fields h4 {
+  margin: 0 0 12px 0;
+  color: #374151;
+}
+
+/* Request Verification Button */
+.request-verification-btn {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.request-verification-btn:hover {
+  background: #2563eb;
+}
+
+.request-verification-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
