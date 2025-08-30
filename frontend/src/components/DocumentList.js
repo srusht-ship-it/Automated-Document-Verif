@@ -18,7 +18,7 @@ const DocumentList = () => {
 
   const loadDocuments = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('doc_verify_token');
       const response = await fetch('http://localhost:5000/api/documents', {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -27,7 +27,22 @@ const DocumentList = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setDocuments(data.documents || []);
+        const docs = data.data?.documents || [];
+        // Map backend response to component format
+        const mappedDocs = docs.map(doc => ({
+          id: doc.id,
+          originalName: doc.originalName,
+          mimeType: doc.mimeType,
+          fileSize: doc.metadata?.fileSize || 0,
+          uploadDate: doc.uploadedAt,
+          verificationStatus: doc.status,
+          extractedText: doc.extractedTextPreview,
+          fileHash: doc.hash || 'N/A',
+          documentType: doc.documentType,
+          issuer: doc.issuer,
+          verificationDate: doc.updatedAt
+        }));
+        setDocuments(mappedDocs);
       } else {
         const errorData = await response.json();
         setError(errorData.message || 'Failed to load documents');
@@ -79,7 +94,8 @@ const DocumentList = () => {
       
       const matchesType = filterType === 'all' || 
                          (filterType === 'pdf' && doc.mimeType?.includes('pdf')) ||
-                         (filterType === 'image' && doc.mimeType?.includes('image'));
+                         (filterType === 'image' && doc.mimeType?.includes('image')) ||
+                         doc.verificationStatus === filterType;
       
       return matchesSearch && matchesType;
     })
@@ -99,7 +115,7 @@ const DocumentList = () => {
 
   const downloadDocument = async (documentId, fileName) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('doc_verify_token');
       const response = await fetch(`http://localhost:5000/api/documents/${documentId}/download`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -187,9 +203,12 @@ const DocumentList = () => {
             onChange={(e) => setFilterType(e.target.value)}
             className="filter-select"
           >
-            <option value="all">All Types</option>
+            <option value="all">All Documents</option>
             <option value="pdf">PDF Documents</option>
             <option value="image">Images</option>
+            <option value="verified">Verified</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
           </select>
 
           <select 
@@ -231,6 +250,10 @@ const DocumentList = () => {
         <div className="stat-item">
           <span className="stat-number">{documents.filter(d => d.verificationStatus === 'pending').length}</span>
           <span className="stat-label">Pending</span>
+        </div>
+        <div className="stat-item">
+          <span className="stat-number">{documents.filter(d => d.verificationStatus === 'rejected').length}</span>
+          <span className="stat-label">Rejected</span>
         </div>
       </div>
 
@@ -279,6 +302,11 @@ const DocumentList = () => {
                     <span className="metadata-value">
                       {new Date(document.uploadDate).toLocaleDateString()}
                     </span>
+                  </div>
+                  
+                  <div className="metadata-item">
+                    <span className="metadata-label">Type:</span>
+                    <span className="metadata-value">{document.documentType || 'Unknown'}</span>
                   </div>
                   
                   {document.extractedText && (

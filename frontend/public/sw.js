@@ -4,8 +4,6 @@
 const CACHE_NAME = 'doc-verify-v1';
 const urlsToCache = [
   '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
   '/manifest.json'
 ];
 

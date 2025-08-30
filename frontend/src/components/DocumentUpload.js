@@ -1,101 +1,84 @@
-// frontend/src/components/DocumentUpload.js
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import '../styles/DocumentUpload.css';
 
 const DocumentUpload = ({ onUploadSuccess }) => {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState({});
-  const [uploadResults, setUploadResults] = useState([]);
-  const [error, setError] = useState('');
-  const fileInputRef = useRef(null);
 
-  const supportedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-  const maxFileSize = 50 * 1024 * 1024; // 50MB
-
-  const validateFile = (file) => {
-    if (!supportedTypes.includes(file.type)) {
-      return 'Unsupported file type. Please upload JPEG, PNG, or PDF files.';
-    }
-    if (file.size > maxFileSize) {
-      return 'File size exceeds 50MB limit.';
-    }
-    return null;
+  const handleFileChange = (event) => {
+    const selectedFiles = Array.from(event.target.files);
+    setFiles(selectedFiles);
   };
 
-  const handleFiles = (selectedFiles) => {
-    const fileArray = Array.from(selectedFiles);
-    const validFiles = [];
-    let hasErrors = false;
+  const handleUpload = async () => {
+    if (files.length === 0) {
+      alert('Please select files to upload');
+      return;
+    }
 
-    fileArray.forEach(file => {
-      const error = validateFile(file);
-      if (error) {
-        setError(error);
-        hasErrors = true;
-      } else {
-        validFiles.push({
-          file,
-          id: Date.now() + Math.random(),
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
-          status: 'pending'
+    setUploading(true);
+    const results = [];
+    
+    try {
+      const token = localStorage.getItem('doc_verify_token');
+      if (!token) {
+        alert('Please login first');
+        return;
+      }
+
+      // Upload each file
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('document', file);
+        formData.append('documentType', 'other');
+        formData.append('description', `Uploaded via dashboard: ${file.name}`);
+
+        const response = await fetch('http://localhost:5000/api/documents/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
         });
+
+        if (response.ok) {
+          const data = await response.json();
+          results.push({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            status: 'uploaded',
+            id: data.data.document.id,
+            documentType: data.data.document.documentType
+          });
+        } else {
+          const errorData = await response.json();
+          console.error('Upload failed:', errorData);
+          alert(`Failed to upload ${file.name}: ${errorData.message}`);
+        }
       }
-    });
 
-    if (!hasErrors) {
-      setError('');
-      setFiles(prev => [...prev, ...validFiles]);
-    }
-  };
-
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFiles(e.dataTransfer.files);
-    }
-  };
-
-  const handleFileInput = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFiles(e.target.files);
-    }
-  };
-
-  const removeFile = (fileId) => {
-    setFiles(prev => {
-      const updatedFiles = prev.filter(f => f.id !== fileId);
-      // Clean up preview URLs
-      const removedFile = prev.find(f => f.id === fileId);
-      if (removedFile && removedFile.preview) {
-        URL.revokeObjectURL(removedFile.preview);
+      // Call success callback if any files were uploaded
+      if (results.length > 0 && onUploadSuccess) {
+        onUploadSuccess(results);
       }
-      return updatedFiles;
-    });
 
-    // Remove from progress tracking
-    setUploadProgress(prev => {
-      const updated = { ...prev };
-      delete updated[fileId];
-      return updated;
-    });
+      // Clear files
+      setFiles([]);
+      // Reset file input
+      const fileInput = document.getElementById('file-input');
+      if (fileInput) fileInput.value = '';
+      
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeFile = (index) => {
+    setFiles(files.filter((_, i) => i !== index));
   };
 
   const formatFileSize = (bytes) => {
@@ -106,243 +89,100 @@ const DocumentUpload = ({ onUploadSuccess }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const uploadFiles = async () => {
-    if (files.length === 0) {
-      setError('Please select files to upload.');
-      return;
-    }
-
-    setUploading(true);
-    setError('');
-    const results = [];
-
-    for (const fileData of files) {
-      try {
-        // Update progress
-        setUploadProgress(prev => ({
-          ...prev,
-          [fileData.id]: { progress: 0, status: 'uploading' }
-        }));
-
-        const formData = new FormData();
-        formData.append('document', fileData.file);
-        formData.append('documentType', 'other');
-        formData.append('recipientEmail', 'individual@demo.com');
-        formData.append('description', `Uploaded via frontend: ${fileData.name}`);
-
-        // Get auth token
-        const token = localStorage.getItem('doc_verify_token');
-        
-        const response = await fetch('http://localhost:5000/api/documents/upload', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formData
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          
-          setUploadProgress(prev => ({
-            ...prev,
-            [fileData.id]: { progress: 100, status: 'completed' }
-          }));
-
-          results.push({
-            ...fileData,
-            status: 'completed',
-            documentId: result.data.document.id,
-            uploadDate: new Date().toISOString()
-          });
-
-          // Update file status
-          setFiles(prev => prev.map(f => 
-            f.id === fileData.id ? { ...f, status: 'completed' } : f
-          ));
-
-        } else {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Upload failed');
-        }
-
-      } catch (error) {
-        console.error('Upload error:', error);
-        
-        setUploadProgress(prev => ({
-          ...prev,
-          [fileData.id]: { progress: 0, status: 'error' }
-        }));
-
-        results.push({
-          ...fileData,
-          status: 'error',
-          error: error.message
-        });
-
-        setFiles(prev => prev.map(f => 
-          f.id === fileData.id ? { ...f, status: 'error', error: error.message } : f
-        ));
-      }
-    }
-
-    setUploadResults(results);
-    setUploading(false);
-
-    // Call success callback if provided
-    if (onUploadSuccess && results.some(r => r.status === 'completed')) {
-      onUploadSuccess(results.filter(r => r.status === 'completed'));
-    }
-  };
-
-  const clearAll = () => {
-    // Clean up preview URLs
-    files.forEach(file => {
-      if (file.preview) {
-        URL.revokeObjectURL(file.preview);
-      }
-    });
-    
-    setFiles([]);
-    setUploadProgress({});
-    setUploadResults([]);
-    setError('');
-  };
-
   return (
-    <div className="document-upload">
-      <div className="upload-header">
-        <h2>Upload Documents</h2>
-        <p>Upload your documents for verification and secure storage</p>
-      </div>
-
-      <div 
-        className={`upload-zone ${dragActive ? 'drag-active' : ''}`}
-        onDragEnter={handleDrag}
-        onDragLeave={handleDrag}
-        onDragOver={handleDrag}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current.click()}
-      >
+    <div style={{ maxWidth: '500px' }}>
+      <div style={{ marginBottom: '20px' }}>
+        <label htmlFor="file-input" style={{ 
+          display: 'block', 
+          marginBottom: '10px',
+          fontWeight: 'bold'
+        }}>
+          Select Documents to Upload:
+        </label>
         <input
-          ref={fileInputRef}
+          id="file-input"
           type="file"
           multiple
-          accept=".jpg,.jpeg,.png,.pdf"
-          onChange={handleFileInput}
-          style={{ display: 'none' }}
+          onChange={handleFileChange}
+          accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
+          style={{
+            padding: '10px',
+            border: '2px dashed #ccc',
+            borderRadius: '4px',
+            width: '100%',
+            cursor: 'pointer'
+          }}
         />
-        
-        <div className="upload-icon">
-          {dragActive ? '📁' : '📎'}
-        </div>
-        
-        <div className="upload-text">
-          <h3>{dragActive ? 'Drop files here' : 'Choose files or drag here'}</h3>
-          <p>Supports: JPEG, PNG, PDF (Max 50MB each)</p>
-        </div>
-        
-        <button className="upload-button">
-          Browse Files
-        </button>
+        <small style={{ color: '#666', marginTop: '5px', display: 'block' }}>
+          Accepted formats: PDF, DOC, DOCX, JPG, PNG, GIF
+        </small>
       </div>
 
-      {error && (
-        <div className="error-message">
-          <span className="error-icon">⚠️</span>
-          {error}
-        </div>
-      )}
-
       {files.length > 0 && (
-        <div className="file-list-section">
-          <div className="file-list-header">
-            <h3>Selected Files ({files.length})</h3>
-            <div className="file-actions">
-              <button 
-                className="upload-all-btn"
-                onClick={uploadFiles}
-                disabled={uploading}
-              >
-                {uploading ? '⏳ Uploading...' : '📤 Upload All'}
-              </button>
-              <button 
-                className="clear-all-btn"
-                onClick={clearAll}
-                disabled={uploading}
-              >
-                🗑️ Clear All
-              </button>
-            </div>
-          </div>
-
-          <div className="file-list">
-            {files.map((fileData) => {
-              const progress = uploadProgress[fileData.id];
-              return (
-                <div key={fileData.id} className={`file-item ${fileData.status}`}>
-                  <div className="file-preview">
-                    {fileData.preview ? (
-                      <img src={fileData.preview} alt="Preview" />
-                    ) : (
-                      <div className="file-type-icon">
-                        {fileData.type === 'application/pdf' ? '📄' : '📎'}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="file-info">
-                    <div className="file-name">{fileData.name}</div>
-                    <div className="file-size">{formatFileSize(fileData.size)}</div>
-                    
-                    {progress && (
-                      <div className="upload-progress">
-                        <div className="progress-bar">
-                          <div 
-                            className="progress-fill"
-                            style={{ width: `${progress.progress}%` }}
-                          ></div>
-                        </div>
-                        <span className="progress-text">
-                          {progress.status === 'uploading' ? `${progress.progress}%` : 
-                           progress.status === 'completed' ? '✅ Completed' : 
-                           progress.status === 'error' ? '❌ Failed' : ''}
-                        </span>
-                      </div>
-                    )}
-
-                    {fileData.error && (
-                      <div className="file-error">❌ {fileData.error}</div>
-                    )}
-                  </div>
-
-                  <div className="file-actions">
-                    <button
-                      className="remove-file-btn"
-                      onClick={() => removeFile(fileData.id)}
-                      disabled={uploading}
-                    >
-                      ❌
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+        <div style={{ marginBottom: '20px' }}>
+          <h4>Selected Files:</h4>
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            {files.map((file, index) => (
+              <li key={index} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '8px',
+                margin: '5px 0',
+                background: '#f8f9fa',
+                borderRadius: '4px',
+                border: '1px solid #e9ecef'
+              }}>
+                <span>
+                  📎 {file.name} ({formatFileSize(file.size)})
+                </span>
+                <button
+                  onClick={() => removeFile(index)}
+                  style={{
+                    background: '#dc3545',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '3px',
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
-      {uploadResults.length > 0 && (
-        <div className="upload-results">
-          <h3>Upload Results</h3>
-          <div className="results-summary">
-            <span className="success-count">
-              ✅ {uploadResults.filter(r => r.status === 'completed').length} Successful
-            </span>
-            <span className="error-count">
-              ❌ {uploadResults.filter(r => r.status === 'error').length} Failed
-            </span>
-          </div>
+      <button
+        onClick={handleUpload}
+        disabled={files.length === 0 || uploading}
+        style={{
+          background: files.length === 0 || uploading ? '#6c757d' : '#28a745',
+          color: 'white',
+          border: 'none',
+          padding: '12px 24px',
+          borderRadius: '4px',
+          cursor: files.length === 0 || uploading ? 'not-allowed' : 'pointer',
+          fontSize: '16px',
+          width: '100%'
+        }}
+      >
+        {uploading ? '⏳ Uploading...' : `📤 Upload ${files.length > 0 ? `${files.length} File(s)` : 'Documents'}`}
+      </button>
+
+      {uploading && (
+        <div style={{
+          marginTop: '10px',
+          padding: '10px',
+          background: '#fff3cd',
+          border: '1px solid #ffeeba',
+          borderRadius: '4px',
+          textAlign: 'center'
+        }}>
+          Processing your upload...
         </div>
       )}
     </div>

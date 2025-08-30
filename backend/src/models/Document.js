@@ -47,10 +47,7 @@ const Document = sequelize.define('Document', {
   documentTypeId: {
     type: DataTypes.INTEGER,
     field: 'document_type_id',
-    references: {
-      model: 'document_types',
-      key: 'id'
-    }
+    allowNull: true
   },
   status: {
     type: DataTypes.ENUM('pending', 'verified', 'rejected'),

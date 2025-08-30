@@ -4,6 +4,9 @@ const {
   uploadDocument, 
   getDocuments, 
   getDocumentById, 
+  updateDocumentStatus,
+  getDocumentStats,
+  getDocumentTypes,
   deleteDocument 
 } = require('../controllers/documentController');
 const { authenticateToken, requireRole } = require('../middleware/auth');
@@ -32,9 +35,10 @@ const uploadValidation = [
     .isIn(['birth_certificate', 'academic_transcript', 'experience_certificate', 'other'])
     .withMessage('Invalid document type'),
   body('recipientEmail')
+    .optional()
     .isEmail()
     .normalizeEmail()
-    .withMessage('Valid recipient email is required'),
+    .withMessage('Valid recipient email is required when provided'),
   body('description')
     .optional()
     .isString()
@@ -90,12 +94,37 @@ router.get('/',
 );
 
 /**
+ * GET /api/documents/types
+ * Get all document types and categories
+ */
+router.get('/types', getDocumentTypes);
+
+/**
+ * GET /api/documents/stats
+ * Get document statistics for dashboard
+ */
+router.get('/stats',
+  authenticateToken,
+  getDocumentStats
+);
+
+/**
  * GET /api/documents/:id
  * Get specific document details
  */
 router.get('/:id',
   authenticateToken,
   getDocumentById
+);
+
+/**
+ * PUT /api/documents/:id/status
+ * Update document status (verifiers and issuers)
+ */
+router.put('/:id/status',
+  authenticateToken,
+  requireRole(['verifier', 'issuer']),
+  updateDocumentStatus
 );
 
 /**

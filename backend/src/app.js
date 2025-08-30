@@ -12,6 +12,7 @@ const { syncModels } = require('./models');
 // Import routes
 const authRoutes = require('./routes/auth');
 const documentRoutes = require('./routes/documents');
+const userRoutes = require('./routes/users');
 
 const app = express();
 
@@ -32,7 +33,9 @@ app.use('/api/', limiter);
 // CORS configuration
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 // Body parser middleware
@@ -55,6 +58,7 @@ app.get('/api/health', (req, res) => {
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/users', userRoutes);
 
 // Initialize database models
 const initializeDatabase = async () => {

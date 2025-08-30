@@ -32,11 +32,17 @@ class AuthService {
     try {
       const response = await apiMethods.auth.register(userData);
       
-      if (response.data.token) {
-        this.setAuthData(response.data.token, response.data.user);
+      // Handle both nested and flat response structures
+      const responseData = response.data.data || response.data;
+      
+      if (responseData.token) {
+        this.setAuthData(responseData.token, responseData.user);
       }
       
-      return response.data;
+      return {
+        success: true,
+        data: responseData
+      };
     } catch (error) {
       this.handleAuthError(error);
       throw error;
@@ -190,28 +196,14 @@ class AuthService {
   }
 
   /**
-   * Refresh authentication token
+   * Refresh authentication token (not implemented in backend)
    * @returns {Promise<Object>} Refresh response
    */
   async refreshToken() {
-    try {
-      const refreshToken = localStorage.getItem(this.REFRESH_TOKEN_KEY);
-      
-      if (!refreshToken) {
-        throw new Error('No refresh token available');
-      }
-      
-      const response = await apiMethods.auth.refreshToken(refreshToken);
-      
-      if (response.data.token) {
-        this.setAuthData(response.data.token, response.data.user, response.data.refreshToken);
-      }
-      
-      return response.data;
-    } catch (error) {
-      this.logout();
-      throw error;
-    }
+    // Refresh tokens not implemented in backend
+    // Just logout the user
+    this.logout();
+    throw new Error('Session expired. Please login again.');
   }
 
   /**
@@ -333,18 +325,11 @@ class AuthService {
     api.interceptors.response.use(
       (response) => response,
       async (error) => {
-        const originalRequest = error.config;
-        
-        if (error.response?.status === 401 && !originalRequest._retry) {
-          originalRequest._retry = true;
-          
-          try {
-            await this.refreshToken();
-            originalRequest.headers['Authorization'] = `Bearer ${this.getToken()}`;
-            return api(originalRequest);
-          } catch (refreshError) {
-            this.logout();
-            return Promise.reject(refreshError);
+        if (error.response?.status === 401) {
+          // Token expired or invalid - logout user
+          this.logout();
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
           }
         }
         

@@ -1,6 +1,8 @@
 const { Document, User } = require('../models');
 const { generateFileHash, deleteFile } = require('../middleware/upload');
 const { extractText, analyzeDocumentText } = require('../utils/ocr');
+const { sequelize } = require('../config/database');
+const { suggestDocumentType, getDocumentTypeById, getAllDocumentTypes, getAllCategories } = require('../utils/documentTypes');
 const path = require('path');
 
 /**
@@ -12,24 +14,37 @@ const uploadDocument = async (req, res) => {
     const issuer = req.user;
 
     // Validate required fields
-    if (!documentType || !recipientEmail) {
-      // Clean up uploaded file if validation fails
+    if (!documentType) {
       if (req.fileInfo) {
         await deleteFile(req.fileInfo.path);
       }
       return res.status(400).json({
         success: false,
-        message: 'Document type and recipient email are required'
+        message: 'Document type is required'
       });
     }
 
-    // Find recipient user
-    const recipient = await User.findOne({ where: { email: recipientEmail } });
-    if (!recipient) {
+    // Determine recipient based on user role and provided email
+    let recipient;
+    if (issuer.role === 'individual' && !recipientEmail) {
+      // Individual uploading for themselves
+      recipient = issuer;
+    } else if (recipientEmail) {
+      // Find specified recipient
+      recipient = await User.findOne({ where: { email: recipientEmail } });
+      if (!recipient) {
+        await deleteFile(req.fileInfo.path);
+        return res.status(404).json({
+          success: false,
+          message: 'Recipient user not found'
+        });
+      }
+    } else {
+      // Issuer must specify recipient email
       await deleteFile(req.fileInfo.path);
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
-        message: 'Recipient user not found'
+        message: 'Recipient email is required for issuers'
       });
     }
 
@@ -53,6 +68,14 @@ const uploadDocument = async (req, res) => {
     
     // Analyze extracted text
     const textAnalysis = analyzeDocumentText(ocrResult.text);
+    
+    // Auto-suggest document type if not provided or invalid
+    let finalDocumentType = documentType;
+    if (!documentType || documentType === 'other') {
+      finalDocumentType = suggestDocumentType(ocrResult.text);
+    }
+    
+    const documentTypeInfo = getDocumentTypeById(finalDocumentType);
 
     // Create document record
     const document = await Document.create({
@@ -70,7 +93,9 @@ const uploadDocument = async (req, res) => {
         mimeType: req.fileInfo.mimetype,
         uploadedAt: new Date().toISOString(),
         description: description || null,
-        documentType: documentType,
+        documentType: finalDocumentType,
+        documentTypeInfo: documentTypeInfo,
+        suggestedType: finalDocumentType !== documentType ? finalDocumentType : null,
         ocrResult: {
           confidence: ocrResult.confidence,
           wordCount: ocrResult.wordCount,
@@ -78,11 +103,11 @@ const uploadDocument = async (req, res) => {
         },
         textAnalysis: textAnalysis,
         issuerInfo: {
-          name: issuer.getFullName(),
+          name: `${issuer.firstName || ''} ${issuer.lastName || ''}`.trim() || 'Unknown',
           organization: issuer.organization
         },
         recipientInfo: {
-          name: recipient.getFullName(),
+          name: `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() || 'Unknown',
           email: recipient.email
         }
       }
@@ -98,17 +123,18 @@ const uploadDocument = async (req, res) => {
           filename: document.filename,
           originalName: document.originalName,
           status: document.status,
-          documentType: documentType,
+          documentType: finalDocumentType,
+          documentTypeInfo: documentTypeInfo,
           uploadedAt: document.createdAt,
           extractedTextPreview: ocrResult.text.substring(0, 200) + (ocrResult.text.length > 200 ? '...' : ''),
           ocrConfidence: ocrResult.confidence,
           textAnalysis: textAnalysis,
           issuer: {
-            name: issuer.getFullName(),
+            name: `${issuer.firstName || ''} ${issuer.lastName || ''}`.trim() || 'Unknown',
             organization: issuer.organization
           },
           recipient: {
-            name: recipient.getFullName(),
+            name: `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() || 'Unknown',
             email: recipient.email
           }
         }
@@ -175,32 +201,44 @@ const getDocuments = async (req, res) => {
           attributes: ['id', 'firstName', 'lastName', 'email']
         }
       ],
-      order: [['createdAt', 'DESC']],
+      order: [['created_at', 'DESC']],
       limit: parseInt(limit),
       offset: offset
     });
 
     // Format response
-    const formattedDocuments = documents.map(doc => ({
-      id: doc.id,
-      filename: doc.filename,
-      originalName: doc.originalName,
-      status: doc.status,
-      uploadedAt: doc.createdAt,
-      updatedAt: doc.updatedAt,
-      documentType: doc.metadata?.documentType || 'unknown',
-      extractedTextPreview: doc.extractedText ? doc.extractedText.substring(0, 150) + '...' : null,
-      ocrConfidence: doc.metadata?.ocrResult?.confidence || 0,
-      issuer: {
-        name: doc.issuer ? doc.issuer.getFullName() : 'Unknown',
-        organization: doc.issuer?.organization,
-        email: doc.issuer?.email
-      },
-      recipient: {
-        name: doc.individual ? doc.individual.getFullName() : 'Unknown',
-        email: doc.individual?.email
-      }
-    }));
+    const formattedDocuments = documents.map(doc => {
+      const issuerName = doc.issuer ? 
+        `${doc.issuer.firstName || ''} ${doc.issuer.lastName || ''}`.trim() || 'Unknown' : 
+        'Unknown';
+      
+      const recipientName = doc.individual ? 
+        `${doc.individual.firstName || ''} ${doc.individual.lastName || ''}`.trim() || 'Unknown' : 
+        'Unknown';
+      
+      return {
+        id: doc.id,
+        filename: doc.filename,
+        originalName: doc.originalName,
+        status: doc.status,
+        uploadedAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+        documentType: doc.metadata?.documentType || 'unknown',
+        extractedTextPreview: doc.extractedText ? doc.extractedText.substring(0, 150) + '...' : null,
+        ocrConfidence: doc.metadata?.ocrResult?.confidence || 0,
+        fileSize: doc.metadata?.fileSize || 0,
+        mimeType: doc.metadata?.mimeType || 'unknown',
+        issuer: {
+          name: issuerName,
+          organization: doc.issuer?.organization,
+          email: doc.issuer?.email
+        },
+        recipient: {
+          name: recipientName,
+          email: doc.individual?.email
+        }
+      };
+    });
 
     res.status(200).json({
       success: true,
@@ -270,6 +308,14 @@ const getDocumentById = async (req, res) => {
     }
 
     // Format detailed response
+    const issuerName = document.issuer ? 
+      `${document.issuer.firstName || ''} ${document.issuer.lastName || ''}`.trim() || 'Unknown' : 
+      'Unknown';
+    
+    const recipientName = document.individual ? 
+      `${document.individual.firstName || ''} ${document.individual.lastName || ''}`.trim() || 'Unknown' : 
+      'Unknown';
+    
     const documentDetails = {
       id: document.id,
       filename: document.filename,
@@ -282,13 +328,13 @@ const getDocumentById = async (req, res) => {
       metadata: document.metadata,
       issuer: {
         id: document.issuer?.id,
-        name: document.issuer ? document.issuer.getFullName() : 'Unknown',
+        name: issuerName,
         organization: document.issuer?.organization,
         email: document.issuer?.email
       },
       recipient: {
         id: document.individual?.id,
-        name: document.individual ? document.individual.getFullName() : 'Unknown',
+        name: recipientName,
         email: document.individual?.email
       }
     };
@@ -305,6 +351,158 @@ const getDocumentById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve document',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * Update document status
+ */
+const updateDocumentStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, verificationNotes } = req.body;
+    const user = req.user;
+
+    // Validate status
+    const validStatuses = ['pending', 'verified', 'rejected'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status. Must be: pending, verified, or rejected'
+      });
+    }
+
+    const document = await Document.findByPk(id);
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document not found'
+      });
+    }
+
+    // Check permissions - only verifiers and issuers can update status
+    if (user.role !== 'verifier' && document.issuerId !== user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only verifiers or document issuers can update status'
+      });
+    }
+
+    // Update document
+    const updatedMetadata = {
+      ...document.metadata,
+      statusHistory: [
+        ...(document.metadata.statusHistory || []),
+        {
+          status: status,
+          updatedBy: user.id,
+          updatedAt: new Date().toISOString(),
+          notes: verificationNotes || null,
+          updatedByRole: user.role
+        }
+      ]
+    };
+
+    await document.update({
+      status: status,
+      metadata: updatedMetadata
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Document status updated successfully',
+      data: {
+        documentId: document.id,
+        newStatus: status,
+        updatedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Update document status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update document status',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * Get document statistics for dashboard
+ */
+const getDocumentStats = async (req, res) => {
+  try {
+    const user = req.user;
+    const whereCondition = {};
+    
+    // Filter based on user role
+    if (user.role === 'issuer') {
+      whereCondition.issuerId = user.id;
+    } else if (user.role === 'individual') {
+      whereCondition.individualId = user.id;
+    }
+
+    const stats = await Document.findAll({
+      where: whereCondition,
+      attributes: [
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      group: ['status'],
+      raw: true
+    });
+
+    // Format stats
+    const formattedStats = {
+      total: 0,
+      pending: 0,
+      verified: 0,
+      rejected: 0
+    };
+
+    stats.forEach(stat => {
+      formattedStats[stat.status] = parseInt(stat.count);
+      formattedStats.total += parseInt(stat.count);
+    });
+
+    res.status(200).json({
+      success: true,
+      data: formattedStats
+    });
+
+  } catch (error) {
+    console.error('Get document stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve document statistics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * Get all document types and categories
+ */
+const getDocumentTypes = async (req, res) => {
+  try {
+    const documentTypes = getAllDocumentTypes();
+    const categories = getAllCategories();
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        documentTypes,
+        categories
+      }
+    });
+  } catch (error) {
+    console.error('Get document types error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve document types',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -364,5 +562,8 @@ module.exports = {
   uploadDocument,
   getDocuments,
   getDocumentById,
+  updateDocumentStatus,
+  getDocumentStats,
+  getDocumentTypes,
   deleteDocument
 };

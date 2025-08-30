@@ -66,8 +66,6 @@ const Register = ({ onRegister }) => {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters long';
-    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
     }
 
     // Confirm password validation
@@ -112,13 +110,36 @@ const Register = ({ onRegister }) => {
       const response = await authService.register(registrationData);
       
       if (response.success) {
-        // Check if onRegister prop is provided and is a function
-        if (onRegister && typeof onRegister === 'function') {
-          onRegister(response.data.token, response.data.user);
+        console.log('Registration successful:', response.data);
+        
+        // Auto-login after successful registration
+        if (response.data.token && response.data.user) {
+          // Store authentication data
+          localStorage.setItem('doc_verify_token', response.data.token);
+          localStorage.setItem('doc_verify_user', JSON.stringify(response.data.user));
+          
+          // Check if onRegister prop is provided
+          if (onRegister && typeof onRegister === 'function') {
+            onRegister(response.data.token, response.data.user);
+          } else {
+            // Navigate based on user role
+            const userRole = response.data.user.role;
+            switch (userRole) {
+              case 'issuer':
+                navigate('/issuer-dashboard');
+                break;
+              case 'individual':
+                navigate('/individual-dashboard');
+                break;
+              case 'verifier':
+                navigate('/verifier-dashboard');
+                break;
+              default:
+                navigate('/');
+            }
+          }
         } else {
-          // Fallback: redirect to login or dashboard
-          console.log('Registration successful:', response.data);
-          // You can redirect to login page or dashboard based on your app flow
+          // Fallback to login page
           navigate('/login', { 
             state: { message: 'Registration successful! Please log in.' } 
           });

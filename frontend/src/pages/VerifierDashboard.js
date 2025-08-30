@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import '../styles/Dashboard.css';
+import SidebarNavigation from '../components/SidebarNavigation';
+import HeaderBar from '../components/HeaderBar';
+import StatsCards from '../components/StatsCards';
+import '../styles/theme.css';
 import '../styles/VerifierDashboard.css';
 
 const VerifierDashboard = () => {
@@ -174,49 +176,37 @@ const VerifierDashboard = () => {
     return <div className="loading">Loading...</div>;
   }
 
+  const currentUser = JSON.parse(localStorage.getItem('doc_verify_user') || '{}');
+
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
-        <div className="header-content">
-          <h1>Verifier Dashboard</h1>
-          <p>Welcome, {user.name} | Verify document authenticity and manage verification requests</p>
-        </div>
-        <div className="user-info">
-          <span className="user-role">Verifier</span>
-          <span className="user-name">{user.name}</span>
-        </div>
-      </div>
-
-      <div className="dashboard-nav">
-        <button 
-          className={`nav-btn ${activeTab === 'verify' ? 'active' : ''}`}
-          onClick={() => setActiveTab('verify')}
-        >
-          <i className="icon">🔍</i>
-          Verify Documents
-        </button>
-        <button 
-          className={`nav-btn ${activeTab === 'requests' ? 'active' : ''}`}
-          onClick={() => setActiveTab('requests')}
-        >
-          <i className="icon">📋</i>
-          Requests ({verificationRequests.length})
-        </button>
-        <button 
-          className={`nav-btn ${activeTab === 'history' ? 'active' : ''}`}
-          onClick={() => setActiveTab('history')}
-        >
-          <i className="icon">📊</i>
-          History
-        </button>
-      </div>
-
-      <div className="dashboard-content">
+    <div className="app-layout">
+      <SidebarNavigation 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
+        userRole={currentUser.role || 'verifier'} 
+      />
+      
+      <div className="main-content with-sidebar">
+        <HeaderBar 
+          title="Verifier Dashboard" 
+          subtitle="Verify document authenticity and manage requests" 
+        />
+        
+        <main className="content-area with-header">
+          <div className="content-wrapper">
         {/* Verification Tab */}
-        {activeTab === 'verify' && (
-          <div className="tab-content">
-            <div className="verification-section">
-              <h2>Document Verification</h2>
+            {activeTab === 'overview' && (
+              <div className="tab-content">
+                <h2 className="section-title">Dashboard Overview</h2>
+                <StatsCards userRole="verifier" />
+                <VerifierOverview />
+              </div>
+            )}
+
+            {activeTab === 'verify' && (
+              <div className="tab-content">
+                <h2 className="section-title">Quick Verify</h2>
+                <div className="verification-section">
               
               <div className="verification-input">
                 <div className="input-methods">
@@ -359,9 +349,9 @@ const VerifierDashboard = () => {
         )}
 
         {/* Requests Tab */}
-        {activeTab === 'requests' && (
-          <div className="tab-content">
-            <h2>Verification Requests</h2>
+            {activeTab === 'queue' && (
+              <div className="tab-content">
+                <h2 className="section-title">Verification Queue</h2>
             {verificationRequests.length === 0 ? (
               <div className="empty-state">
                 <i className="empty-icon">📋</i>
@@ -416,9 +406,9 @@ const VerifierDashboard = () => {
         )}
 
         {/* History Tab */}
-        {activeTab === 'history' && (
-          <div className="tab-content">
-            <h2>Verification History</h2>
+            {activeTab === 'audit' && (
+              <div className="tab-content">
+                <h2 className="section-title">Audit Trail</h2>
             {verificationHistory.length === 0 ? (
               <div className="empty-state">
                 <i className="empty-icon">📊</i>
@@ -460,6 +450,46 @@ const VerifierDashboard = () => {
             )}
           </div>
         )}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+// Verifier Overview Component
+const VerifierOverview = () => {
+  return (
+    <div className="verifier-overview">
+      <div className="grid-2">
+        <div className="card">
+          <h3>Quick Actions</h3>
+          <div className="quick-actions">
+            <button className="btn btn-primary">🔍 Quick Verify</button>
+            <button className="btn btn-secondary">📋 View Queue</button>
+            <button className="btn btn-secondary">📄 Generate Report</button>
+          </div>
+        </div>
+        
+        <div className="card">
+          <h3>Recent Verifications</h3>
+          <div className="activity-list">
+            <div className="activity-item">
+              <span className="activity-icon">✅</span>
+              <div className="activity-content">
+                <p>Certificate verified - 98.5% confidence</p>
+                <small>1 hour ago</small>
+              </div>
+            </div>
+            <div className="activity-item">
+              <span className="activity-icon">⚠️</span>
+              <div className="activity-content">
+                <p>Document flagged - requires review</p>
+                <small>3 hours ago</small>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

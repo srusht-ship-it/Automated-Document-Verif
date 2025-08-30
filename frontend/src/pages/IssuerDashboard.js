@@ -1,9 +1,11 @@
-// frontend/src/pages/IssuerDashboard.js
-import React, { useState } from 'react';
-import Dashboard from '../components/Dashboard';
+import React, { useState, useEffect } from 'react';
+import SidebarNavigation from '../components/SidebarNavigation';
+import HeaderBar from '../components/HeaderBar';
+import StatsCards from '../components/StatsCards';
 import DocumentUpload from '../components/DocumentUpload';
 import DocumentList from '../components/DocumentList';
-import '../styles/Dashboard.css';
+import '../styles/theme.css';
+import '../styles/IssuerDashboard.css';
 
 const IssuerDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -25,49 +27,62 @@ const IssuerDashboard = () => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'overview':
-        return <Dashboard />;
+        return (
+          <div className="tab-content">
+            <h2 className="section-title">Dashboard Overview</h2>
+            <StatsCards userRole="issuer" />
+            <IssuerOverview />
+          </div>
+        );
       case 'issue':
-        return <DocumentUpload onUploadSuccess={handleUploadSuccess} />;
+        return (
+          <div className="tab-content">
+            <h2 className="section-title">Issue Documents</h2>
+            <DocumentIssuancePanel onUploadSuccess={handleUploadSuccess} />
+          </div>
+        );
       case 'documents':
-        return <DocumentList />;
+        return (
+          <div className="tab-content">
+            <h2 className="section-title">Issued Documents</h2>
+            <DocumentList />
+          </div>
+        );
       case 'templates':
         return <DocumentTemplates />;
-      case 'analytics':
-        return <Analytics />;
+      case 'bulk':
+        return <BulkUploadInterface />;
       default:
-        return <Dashboard />;
+        return (
+          <div className="tab-content">
+            <h2 className="section-title">Dashboard Overview</h2>
+            <StatsCards userRole="issuer" />
+          </div>
+        );
     }
   };
 
+  const user = JSON.parse(localStorage.getItem('doc_verify_user') || '{}');
+
   return (
-    <div className="issuer-dashboard">
-      <div className="dashboard-sidebar">
-        <div className="sidebar-header">
-          <div className="user-info">
-            <div className="user-avatar">🏛️</div>
-            <div className="user-details">
-              <h3>Issuing Authority</h3>
-              <p>Document Issuer</p>
-            </div>
+    <div className="app-layout">
+      <SidebarNavigation 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
+        userRole={user.role || 'issuer'} 
+      />
+      
+      <div className="main-content with-sidebar">
+        <HeaderBar 
+          title="Issuer Dashboard" 
+          subtitle="Issue and manage document certificates" 
+        />
+        
+        <main className="content-area with-header">
+          <div className="content-wrapper">
+            {renderTabContent()}
           </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <span className="nav-icon">{tab.icon}</span>
-              <span className="nav-label">{tab.label}</span>
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      <div className="dashboard-main">
-        {renderTabContent()}
+        </main>
       </div>
     </div>
   );
@@ -246,6 +261,71 @@ const Analytics = () => {
             <div className="legend-color verified"></div>
             <span>Verified</span>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Issuer Overview Component
+const IssuerOverview = () => {
+  return (
+    <div className="issuer-overview">
+      <div className="grid-2">
+        <div className="card">
+          <h3>Quick Actions</h3>
+          <div className="quick-actions">
+            <button className="btn btn-primary">📜 Issue Certificate</button>
+            <button className="btn btn-secondary">📋 Bulk Upload</button>
+            <button className="btn btn-secondary">🎨 Create Template</button>
+          </div>
+        </div>
+        
+        <div className="card">
+          <h3>Recent Activity</h3>
+          <div className="activity-list">
+            <div className="activity-item">
+              <span className="activity-icon">📄</span>
+              <div className="activity-content">
+                <p>Degree certificate issued to John Doe</p>
+                <small>2 hours ago</small>
+              </div>
+            </div>
+            <div className="activity-item">
+              <span className="activity-icon">✅</span>
+              <div className="activity-content">
+                <p>Transcript verified for Jane Smith</p>
+                <small>4 hours ago</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Document Issuance Panel Component
+const DocumentIssuancePanel = ({ onUploadSuccess }) => {
+  return (
+    <div className="document-issuance">
+      <div className="card">
+        <DocumentUpload onUploadSuccess={onUploadSuccess} />
+      </div>
+    </div>
+  );
+};
+
+// Bulk Upload Interface Component
+const BulkUploadInterface = () => {
+  return (
+    <div className="bulk-upload">
+      <div className="card">
+        <h3>Bulk Document Upload</h3>
+        <p>Upload multiple documents at once using CSV template</p>
+        <div className="bulk-actions">
+          <button className="btn btn-secondary">📥 Download Template</button>
+          <button className="btn btn-primary">📤 Upload CSV</button>
         </div>
       </div>
     </div>
