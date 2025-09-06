@@ -1,58 +1,90 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import Tesseract from 'tesseract.js';
+import sharp from 'sharp';
 
 // For now, we'll create a simplified OCR utility that doesn't require Tesseract
 // This will prevent installation issues and get your system running quickly
 
 /**
- * Extract text from image using simplified method
+ * Preprocess image for better OCR results
+ */
+const preprocessImage = async (imagePath) => {
+  try {
+    const processedPath = imagePath.replace(/\.(jpg|jpeg|png)$/i, '_processed.png');
+    
+    await sharp(imagePath)
+      .resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true })
+      .greyscale()
+      .normalize()
+      .sharpen()
+      .png()
+      .toFile(processedPath);
+    
+    return processedPath;
+  } catch (error) {
+    console.warn('Image preprocessing failed, using original:', error.message);
+    return imagePath;
+  }
+};
+
+/**
+ * Extract text from image using real Tesseract.js OCR
  * @param {string} imagePath - Path to the image file
  * @param {Object} options - OCR options
  * @returns {Promise<Object>} - OCR results
  */
 const extractTextFromImage = async (imagePath, options = {}) => {
   try {
-    console.log(`Mock OCR processing for: ${imagePath}`);
+    console.log(`Real OCR processing for: ${imagePath}`);
     
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Preprocess image for better OCR
+    const processedPath = await preprocessImage(imagePath);
+    
+    // Configure Tesseract options
+    const ocrOptions = {
+      logger: m => console.log('OCR Progress:', m),
+      ...options
+    };
 
-    // Mock extracted text based on file name or return sample text
-    const mockText = `
-    SAMPLE DOCUMENT
-    Name: John Doe
-    Date of Birth: January 15, 1995
-    Institution: State University
-    Document Type: Academic Transcript
-    Grade: A
-    Date Issued: December 2023
-    `;
+    // Run Tesseract OCR
+    const { data } = await Tesseract.recognize(processedPath, 'eng', ocrOptions);
+    
+    // Clean up processed file
+    if (processedPath !== imagePath && fs.existsSync(processedPath)) {
+      fs.unlinkSync(processedPath);
+    }
+
+    // Extract detailed information
+    const words = data.words.map(word => ({
+      text: word.text,
+      confidence: word.confidence,
+      bbox: word.bbox
+    }));
+
+    const lines = data.lines.map(line => ({
+      text: line.text,
+      confidence: line.confidence,
+      bbox: line.bbox
+    }));
 
     return {
       success: true,
-      text: mockText.trim(),
-      confidence: 85,
-      wordCount: 12,
-      words: [
-        { text: 'SAMPLE', confidence: 90, bbox: {} },
-        { text: 'DOCUMENT', confidence: 88, bbox: {} },
-        { text: 'John', confidence: 92, bbox: {} },
-        { text: 'Doe', confidence: 89, bbox: {} }
-      ],
-      lines: [
-        { text: 'SAMPLE DOCUMENT', confidence: 89, bbox: {} },
-        { text: 'Name: John Doe', confidence: 90, bbox: {} }
-      ],
+      text: data.text.trim(),
+      confidence: Math.round(data.confidence),
+      wordCount: words.length,
+      words: words,
+      lines: lines,
       metadata: {
         processingTime: Date.now(),
-        ocrEngine: 'Mock OCR Engine',
+        ocrEngine: 'Tesseract.js v4',
         language: 'eng',
-        note: 'This is a mock OCR result for testing purposes'
+        imagePreprocessed: processedPath !== imagePath
       }
     };
 
   } catch (error) {
-    console.error('OCR extraction failed:', error);
+    console.error('Real OCR extraction failed:', error);
     return {
       success: false,
       error: error.message,
@@ -66,25 +98,32 @@ const extractTextFromImage = async (imagePath, options = {}) => {
 };
 
 /**
- * Extract text from PDF (placeholder)
+ * Extract text from PDF using Tesseract.js
  * @param {string} pdfPath - Path to the PDF file
  * @returns {Promise<Object>} - Extracted text results
  */
 const extractTextFromPDF = async (pdfPath) => {
   try {
-    console.log(`Mock PDF text extraction for: ${pdfPath}`);
+    console.log(`Real PDF OCR processing for: ${pdfPath}`);
     
+    // Use Tesseract to extract text from PDF
+    const { data } = await Tesseract.recognize(pdfPath, 'eng', {
+      logger: m => console.log('PDF OCR Progress:', m)
+    });
+
     return {
       success: true,
-      text: 'Sample PDF content extracted here...',
-      confidence: 75,
+      text: data.text.trim(),
+      confidence: Math.round(data.confidence),
+      wordCount: data.words.length,
       metadata: {
         processingTime: Date.now(),
         fileType: 'PDF',
-        note: 'Mock PDF extraction'
+        ocrEngine: 'Tesseract.js v4'
       }
     };
   } catch (error) {
+    console.error('PDF OCR extraction failed:', error);
     return {
       success: false,
       error: error.message,
@@ -195,7 +234,7 @@ const analyzeDocumentText = (text) => {
   return analysis;
 };
 
-module.exports = {
+export {
   extractText,
   extractTextFromImage,
   extractTextFromPDF,

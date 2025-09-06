@@ -1,6 +1,6 @@
-const User = require('./User');
-const Document = require('./Document');
-const { sequelize } = require('../config/database');
+import User from './User.js';
+import Document from './Document.js';
+import { sequelize } from '../config/database.js';
 
 // Define associations
 User.hasMany(Document, { 
@@ -33,7 +33,7 @@ const syncModels = async () => {
   }
 };
 
-module.exports = {
+export {
   User,
   Document,
   sequelize,

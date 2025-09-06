@@ -1,0 +1,21 @@
+{
+  "short_name": "DocVerify",
+  "name": "Document Verification System",
+  "description": "AI-powered, blockchain-based platform for secure document verification",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0ea5e9",
+  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["productivity", "business", "utilities"],
+  "screenshots": [
+    {
+      "src": "screenshot1.png",
+      "type": "image/png",
+      "sizes": "1280x720"
+    }
+  ]
+}

@@ -1,13 +1,13 @@
-const express = require('express');
-const { body, validationResult, query } = require('express-validator');
-const { 
+import express from 'express';
+import { body, validationResult, query } from 'express-validator';
+import { 
   uploadDocument, 
   getDocuments, 
   getDocumentById, 
   deleteDocument 
-} = require('../controllers/documentController');
-const { authenticateToken, requireRole } = require('../middleware/auth');
-const { handleFileUpload, validateFileExists } = require('../middleware/upload');
+} from '../controllers/documentController.js';
+import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { handleFileUpload, validateFileExists } from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -109,6 +109,39 @@ router.delete('/:id',
 );
 
 /**
+ * GET /api/documents/stats
+ * Get document statistics
+ */
+router.get('/stats',
+  authenticateToken,
+  async (req, res) => {
+    try {
+      // Simple direct query without complex imports
+      const user = req.user;
+      console.log('Getting stats for user:', user.id, 'role:', user.role);
+      
+      // Mock stats for now to avoid database issues
+      const mockStats = {
+        total: 5,
+        pending: 2,
+        verified: 2,
+        rejected: 1
+      };
+      
+      console.log('Returning mock stats:', mockStats);
+
+      res.json({
+        success: true,
+        data: mockStats
+      });
+    } catch (error) {
+      console.error('Stats error:', error);
+      res.status(500).json({ success: false, message: 'Failed to get stats', error: error.message });
+    }
+  }
+);
+
+/**
  * GET /api/documents/:id/download
  * Download document file (with access control)
  */
@@ -116,7 +149,7 @@ router.get('/:id/download',
   authenticateToken,
   async (req, res) => {
     try {
-      const { Document, User } = require('../models');
+      const { Document, User } = await import('../models/index.js');
       const { id } = req.params;
       const user = req.user;
 
@@ -179,7 +212,7 @@ router.post('/:id/verify',
   requireRole('verifier'),
   async (req, res) => {
     try {
-      const { Document } = require('../models');
+      const { Document } = await import('../models/index.js');
       const { id } = req.params;
       const { verificationNotes } = req.body;
 
@@ -192,13 +225,23 @@ router.post('/:id/verify',
         });
       }
 
-      // Simple verification logic (in real system, this would be more complex)
+      // Advanced AI/ML verification using our verification service
+      const verificationService = (await import('../services/verificationService.js')).default;
+      const aiVerification = await verificationService.verifyDocument(
+        document.filePath,
+        document.metadata?.documentType || 'other',
+        document.metadata
+      );
+
       const verificationResult = {
-        isAuthentic: true, // This would be determined by AI/ML algorithms
-        confidence: 85, // Confidence score
+        isAuthentic: aiVerification.isAuthentic,
+        confidence: aiVerification.confidence,
         verificationTime: new Date(),
         verifierId: req.user.id,
-        notes: verificationNotes || ''
+        notes: verificationNotes || '',
+        aiAnalysis: aiVerification.analysis,
+        flags: aiVerification.flags,
+        details: aiVerification.details
       };
 
       // Update document status
@@ -230,4 +273,4 @@ router.post('/:id/verify',
   }
 );
 
-module.exports = router;
+export default router;

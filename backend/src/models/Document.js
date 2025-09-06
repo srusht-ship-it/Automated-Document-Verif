@@ -1,5 +1,5 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../config/database');
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../config/database.js';
 
 const Document = sequelize.define('Document', {
   id: {
@@ -46,11 +46,7 @@ const Document = sequelize.define('Document', {
   },
   documentTypeId: {
     type: DataTypes.INTEGER,
-    field: 'document_type_id',
-    references: {
-      model: 'document_types',
-      key: 'id'
-    }
+    field: 'document_type_id'
   },
   status: {
     type: DataTypes.ENUM('pending', 'verified', 'rejected'),
@@ -71,4 +67,4 @@ const Document = sequelize.define('Document', {
   updatedAt: 'updated_at'
 });
 
-module.exports = Document;
+export default Document;

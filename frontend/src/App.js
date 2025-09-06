@@ -13,7 +13,7 @@ import IndividualDashboard from './pages/IndividualDashboard';
 import VerifierDashboard from './pages/VerifierDashboard';
 
 // Services
-import { authService } from './services/auth';
+import authService from './services/auth';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -34,7 +34,7 @@ function App() {
         const parsedUser = JSON.parse(userData);
         setUser(parsedUser);
         setIsAuthenticated(true);
-        authService.setAuthToken(token);
+        authService.setToken(token);
       } catch (error) {
         console.error('Error parsing user data:', error);
         handleLogout();
@@ -46,7 +46,7 @@ function App() {
   const handleLogin = (token, userData) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
-    authService.setAuthToken(token);
+    authService.setToken(token);
     setUser(userData);
     setIsAuthenticated(true);
   };
@@ -54,7 +54,7 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    authService.removeAuthToken();
+    authService.logout();
     setUser(null);
     setIsAuthenticated(false);
   };

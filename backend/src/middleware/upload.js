@@ -1,7 +1,11 @@
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Ensure upload directories exist
 const createUploadDirs = () => {
@@ -58,10 +62,11 @@ const fileFilter = (req, file, cb) => {
 };
 
 // Configure multer
+const maxFileSize = parseInt(process.env.MAX_FILE_SIZE) || 52428800; // 50MB default
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 52428800, // 50MB default
+    fileSize: maxFileSize,
     files: 1 // Single file upload
   },
   fileFilter: fileFilter
@@ -75,9 +80,10 @@ const handleFileUpload = (req, res, next) => {
   uploadSingle(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
+        const maxSizeMB = (maxFileSize / (1024 * 1024)).toFixed(1);
         return res.status(400).json({
           success: false,
-          message: 'File too large. Maximum size is 50MB.'
+          message: `File too large. Maximum size is ${maxSizeMB}MB.`
         });
       }
       if (err.code === 'LIMIT_FILE_COUNT') {
@@ -164,7 +170,7 @@ const validateFileExists = (req, res, next) => {
   next();
 };
 
-module.exports = {
+export {
   handleFileUpload,
   validateFileExists,
   generateFileHash,

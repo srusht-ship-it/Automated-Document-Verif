@@ -1,6 +1,6 @@
-const { DataTypes } = require('sequelize');
-const bcrypt = require('bcrypt');
-const { sequelize } = require('../config/database');
+import { DataTypes } from 'sequelize';
+import bcrypt from 'bcrypt';
+import { sequelize } from '../config/database.js';
 
 const User = sequelize.define('User', {
   id: {
@@ -70,4 +70,4 @@ User.prototype.toSafeObject = function() {
   return safeUser;
 };
 
-module.exports = User;
+export default User;

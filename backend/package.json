@@ -2,6 +2,7 @@
   "name": "document-verification-backend",
   "version": "1.0.0",
   "description": "Backend API for document verification system",
+  "type": "module",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

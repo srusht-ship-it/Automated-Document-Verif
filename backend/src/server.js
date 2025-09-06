@@ -1,5 +1,5 @@
-const app = require('./app');
-const { testConnection } = require('./config/database');
+import app from "./app.js";
+import { testConnection } from "./config/database.js";
 
 const PORT = process.env.PORT || 5000;
 
@@ -7,14 +7,14 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
     await testConnection();
-    
+
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
       console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
 };

@@ -1,7 +1,9 @@
-const { Document, User } = require('../models');
-const { generateFileHash, deleteFile } = require('../middleware/upload');
-const { extractText, analyzeDocumentText } = require('../utils/ocr');
-const path = require('path');
+import { Document, User } from '../models/index.js';
+import { generateFileHash, deleteFile } from '../middleware/upload.js';
+import { extractText, analyzeDocumentText } from '../utils/ocr.js';
+import blockchainService from '../services/blockchainService.js';
+import mlFraudDetection from '../services/mlFraudDetection.js';
+import path from 'path';
 
 /**
  * Upload and process a new document
@@ -23,14 +25,19 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    // Find recipient user
-    const recipient = await User.findOne({ where: { email: recipientEmail } });
+    // Find recipient user (for issuers, can be themselves)
+    let recipient = await User.findOne({ where: { email: recipientEmail } });
     if (!recipient) {
-      await deleteFile(req.fileInfo.path);
-      return res.status(404).json({
-        success: false,
-        message: 'Recipient user not found'
-      });
+      // If recipient not found and issuer is uploading for themselves, use issuer as recipient
+      if (recipientEmail === issuer.email) {
+        recipient = issuer;
+      } else {
+        await deleteFile(req.fileInfo.path);
+        return res.status(404).json({
+          success: false,
+          message: 'Recipient user not found. Please register the recipient first or use your own email.'
+        });
+      }
     }
 
     // Generate file hash for uniqueness and integrity
@@ -53,6 +60,24 @@ const uploadDocument = async (req, res) => {
     
     // Analyze extracted text
     const textAnalysis = analyzeDocumentText(ocrResult.text);
+
+    // Enhanced ML fraud detection
+    const mlAnalysis = await mlFraudDetection.analyzeDocument(
+      req.fileInfo.path,
+      ocrResult.text,
+      documentType
+    );
+
+    // Store document on blockchain
+    const blockchainRecord = blockchainService.addDocumentToBlockchain({
+      id: Date.now(), // Temporary ID
+      hash: fileHash,
+      issuerId: issuer.id,
+      individualId: recipient.id,
+      originalName: req.fileInfo.originalName,
+      documentType: documentType,
+      fileSize: req.fileInfo.size
+    });
 
     // Create document record
     const document = await Document.create({
@@ -77,6 +102,8 @@ const uploadDocument = async (req, res) => {
           success: ocrResult.success
         },
         textAnalysis: textAnalysis,
+        mlFraudAnalysis: mlAnalysis,
+        blockchainRecord: blockchainRecord,
         issuerInfo: {
           name: issuer.getFullName(),
           organization: issuer.organization
@@ -175,7 +202,7 @@ const getDocuments = async (req, res) => {
           attributes: ['id', 'firstName', 'lastName', 'email']
         }
       ],
-      order: [['createdAt', 'DESC']],
+      order: [['created_at', 'DESC']],
       limit: parseInt(limit),
       offset: offset
     });
@@ -360,7 +387,7 @@ const deleteDocument = async (req, res) => {
   }
 };
 
-module.exports = {
+export {
   uploadDocument,
   getDocuments,
   getDocumentById,
